@@ -8,14 +8,15 @@
   <style>.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}</style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <div class="max-w-7xl mx-auto p-6 space-y-8">
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+
     <!-- Header -->
     <header class="flex items-center justify-between">
       <div class="flex items-center gap-3">
         <a href="/" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
         <div>
           <h1 class="text-2xl font-semibold">组学软件</h1>
-          <p class="text-sm text-gray-600">按任务分类查找 · 一键复制安装命令</p>
+          <p class="text-sm text-gray-600">按任务分类查找 · 勾选生成安装清单</p>
         </div>
       </div>
       <a href="/" class="text-indigo-600 underline">返回首页</a>
@@ -40,79 +41,261 @@
       </div>
     </section>
 
-    <!-- Category Pills -->
-    <section id="catPills" class="flex flex-wrap gap-2"></section>
+    <!-- Content: list + sidebar -->
+    <section class="grid lg:grid-cols-3 gap-5">
+      <!-- List -->
+      <div class="lg:col-span-2 space-y-4" id="listWrap">
+        <div id="catPills" class="flex flex-wrap gap-2"></div>
+        <div id="list" class="grid md:grid-cols-2 gap-5"></div>
+      </div>
 
-    <!-- Result list -->
-    <section id="list" class="grid md:grid-cols-2 xl:grid-cols-3 gap-5"></section>
+      <!-- Sidebar: bundle -->
+      <aside class="bg-white rounded-2xl shadow p-6 h-fit sticky top-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium">我的清单</h3>
+          <button id="btnClear" class="text-xs text-red-600">清空</button>
+        </div>
+        <ul id="pickedList" class="mt-3 text-sm text-gray-700 space-y-2"></ul>
+        <div class="mt-4 space-y-2">
+          <label class="block text-sm text-gray-600">环境名称</label>
+          <input id="envName" value="gf-env" class="w-full border rounded-xl px-3 py-2" />
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <button id="btnYml" class="px-3 py-2 rounded-xl bg-indigo-600 text-white">导出 environment.yml</button>
+          <button id="btnBash" class="px-3 py-2 rounded-xl border">导出 install.sh</button>
+          <button id="btnDocker" class="px-3 py-2 rounded-xl border">导出 docker_pull.sh</button>
+          <button id="btnCopy" class="px-3 py-2 rounded-xl border">复制 mamba 安装行</button>
+        </div>
+        <!-- Optional: save bundle (仅登录后生效；可稍后接入 Firestore) -->
+        <button id="btnSave" class="mt-3 w-full px-3 py-2 rounded-xl border">保存为我的清单（登录后）</button>
+        <p class="text-xs text-gray-500 mt-2">提示：首选 mamba + bioconda/conda-forge；没有 conda 包的会落到 pip 或仅给源码链接。</p>
+      </aside>
+    </section>
 
-    <footer class="pt-4 text-xs text-gray-500">
-      <p>© 2025 Genome Finder · 软件数据源：内置 JSON（后续可接 Firestore 后台维护）</p>
+    <footer class="pt-2 text-xs text-gray-500">
+      <p>© 2025 Genome Finder · 软件元数据：<code>software_index.json</code> · 分类：<code>software_categories.json</code></p>
     </footer>
   </div>
 
   <script>
-    // Load JSONs (static files next to this page)
-    async function loadJSON(path){ const r = await fetch(path); if(!r.ok) throw new Error(path); return r.json(); }
+    // ---------------------------
+    // Load data
+    // ---------------------------
     const $ = s => document.querySelector(s);
+    async function loadJSON(p){ const r=await fetch(p); if(!r.ok) throw new Error(p); return r.json(); }
+    let CATS=[], DB=[];
+    const qEl=$("#q"), catEl=$("#category"), listEl=$("#list"), pillsEl=$("#catPills");
+    const pickedUl=$("#pickedList");
+    const LS_KEY="gf_software_pick";
+    let PICK = JSON.parse(localStorage.getItem(LS_KEY)||"[]"); // [{id,name}]
 
-    let CATS = [], DB = [];
-    const qEl = $("#q"), catEl = $("#category"), listEl = $("#list"), pillsEl = $("#catPills");
+    function savePick(){ localStorage.setItem(LS_KEY, JSON.stringify(PICK)); }
+    function toast(m){ const d=document.createElement("div"); d.className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl"; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),1200); }
 
-    function pill(id,label){ return `<button data-id="${id}" class="px-3 py-1 rounded-full border text-sm hover:bg-indigo-50">${label}</button>`; }
-    function highlight(text, kw){
-      if(!kw) return text;
-      const re = new RegExp("(" + kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
-      return text.replace(re, '<mark class="bg-yellow-200">$1</mark>');
-    }
-
+    // ---------------------------
+    // Render
+    // ---------------------------
     function renderCats() {
       catEl.innerHTML = `<option value="">全部</option>` + CATS.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
-      pillsEl.innerHTML = CATS.map(c=>pill(c.id,c.name)).join("");
-      pillsEl.querySelectorAll("button").forEach(btn=>{
-        btn.addEventListener("click", ()=>{
-          catEl.value = btn.dataset.id;
-          filter();
-          window.scrollTo({top: listEl.offsetTop-20, behavior:'smooth'});
-        });
-      });
+      pillsEl.innerHTML = CATS.map(c=>`<button data-id="${c.id}" class="px-3 py-1 rounded-full border text-sm hover:bg-indigo-50">${c.name}</button>`).join("");
+      pillsEl.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ catEl.value=b.dataset.id; filter(); window.scrollTo({top:listEl.offsetTop-20,behavior:'smooth'}); }));
     }
 
-    function card(s, kw="") {
+    function isPicked(id){ return PICK.some(x=>x.id===id); }
+    function togglePick(id){
+      const s = DB.find(x=>x.id===id); if(!s) return;
+      const i = PICK.findIndex(x=>x.id===id);
+      if(i>=0) { PICK.splice(i,1); } else { PICK.push({id:s.id, name:s.name}); }
+      savePick(); renderPicked();
+    }
+
+    function card(s) {
       const cats = s.category.map(id => (CATS.find(c=>c.id===id)?.name||id)).join(" · ");
+      const checked = isPicked(s.id) ? 'checked' : '';
       return `
-      <a href="/software/${s.id}.html" class="bg-white rounded-2xl shadow p-5 block hover:shadow-md transition">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-medium">${highlight(s.name, kw)}</h3>
-          <span class="text-xs px-2 py-0.5 rounded bg-gray-100">${(s.langs||[]).join("/")||"—"}</span>
+      <div class="bg-white rounded-2xl shadow p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <a href="/software/${s.id}.html" class="text-lg font-medium underline decoration-indigo-600">${s.name}</a>
+            <p class="text-sm text-gray-600 mt-1">${s.desc||""}</p>
+            <p class="text-xs text-gray-500 mt-2">分类：${cats}</p>
+          </div>
+          <label class="text-sm flex items-center gap-2">
+            <input type="checkbox" data-id="${s.id}" ${checked} class="h-4 w-4"/>
+            <span>加入清单</span>
+          </label>
         </div>
-        <p class="text-sm text-gray-600 mt-2">${highlight(s.desc||"", kw)}</p>
-        <p class="text-xs text-gray-500 mt-3">分类：${cats}</p>
-      </a>`;
+        <div class="mt-3 text-xs text-gray-500">conda: <code>${(s.pkg?.conda_pkg||"—")}${s.pkg?.conda_ver?("=" + s.pkg.conda_ver):""}</code> · docker: <code>${s.pkg?.docker_image? (s.pkg.docker_image + (s.pkg.docker_tag?(":" + s.pkg.docker_tag):"")):"—"}</code></div>
+      </div>`;
     }
 
     function filter() {
-      const kw = (qEl.value||"").trim();
+      const kw = (qEl.value||"").trim().toLowerCase();
       const cid = catEl.value;
       const rows = DB.filter(s=>{
         const inCat = !cid || s.category.includes(cid);
-        const inKw = !kw || (s.name.toLowerCase().includes(kw.toLowerCase()) || (s.desc||"").toLowerCase().includes(kw.toLowerCase()));
+        const inKw = !kw || (s.name.toLowerCase().includes(kw) || (s.desc||"").toLowerCase().includes(kw));
         return inCat && inKw;
       });
-      listEl.innerHTML = rows.length ? rows.map(s=>card(s, kw)).join("") :
-        `<div class="text-gray-500">未找到匹配项。</div>`;
+      listEl.innerHTML = rows.length ? rows.map(card).join("") : `<div class="text-gray-500">未找到匹配项。</div>`;
+      listEl.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
+        chk.addEventListener("change", ()=> togglePick(chk.dataset.id));
+      });
     }
 
-    async function boot() {
+    function renderPicked(){
+      pickedUl.innerHTML = PICK.length ? PICK.map(it=>`
+        <li class="flex items-center justify-between gap-2">
+          <a class="underline text-indigo-600" href="/software/${it.id}.html">${it.name}</a>
+          <button data-id="${it.id}" class="text-xs text-red-600">移除</button>
+        </li>`).join("") : `<li class="text-gray-500">尚未选择</li>`;
+      pickedUl.querySelectorAll("button").forEach(btn=> btn.addEventListener("click", ()=>{ togglePick(btn.dataset.id); filter(); }));
+    }
+
+    // ---------------------------
+    // Exporters
+    // ---------------------------
+    function buildYml(env, items){
+      // Collect conda packages and channels
+      const pkgs = [];
+      const channels = new Set(["conda-forge","bioconda"]); // default safe order
+      for (const it of items) {
+        const s = DB.find(x=>x.id===it.id); if(!s) continue;
+        const p = s.pkg||{};
+        if (p.conda_pkg) {
+          channels.add(...(p.conda_channels||[]));
+          pkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:""));
+        }
+      }
+      // Pip fallback
+      const pipPkgs = [];
+      for (const it of items) {
+        const s = DB.find(x=>x.id===it.id); if(!s) continue;
+        const p = s.pkg||{};
+        if (!p.conda_pkg && p.pip_pkg) {
+          pipPkgs.push(p.pip_pkg + (p.pip_ver?`==${p.pip_ver}`:""));
+        }
+      }
+      const yml = {
+        name: env || "gf-env",
+        channels: Array.from(channels),
+        dependencies: pkgs.length ? pkgs : ["python>=3.10"]
+      };
+      if (pipPkgs.length) {
+        yml.dependencies.push({ pip: pipPkgs });
+      }
+      return `name: ${yml.name}
+channels:
+${yml.channels.map(c=>`  - ${c}`).join("\n")}
+dependencies:
+${yml.dependencies.map(d=> typeof d==="string" ? `  - ${d}` : `  - pip:\n${d.pip.map(p=>`    - ${p}`).join("\n")}`).join("\n")}
+`;
+    }
+
+    function buildInstallSh(env, items){
+      const ymlName = `${env||"gf-env"}.yml`;
+      const condaPkgs = [];
+      const channels = new Set(["conda-forge","bioconda"]);
+      const pipPkgs = [];
+      for (const it of items) {
+        const s = DB.find(x=>x.id===it.id); if(!s) continue;
+        const p = s.pkg||{};
+        if (p.conda_pkg) { channels.add(...(p.conda_channels||[])); condaPkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:"")); }
+        else if (p.pip_pkg) { pipPkgs.push(p.pip_pkg + (p.pip_ver?`==${p.pip_ver}`:"")); }
+      }
+      const chOpt = Array.from(channels).map(c=>`-c ${c}`).join(" ");
+      return `#!/usr/bin/env bash
+set -euo pipefail
+ENV="${env||"gf-env"}"
+
+# Create env if not exists
+mamba env list | grep -q "^$ENV\\s" || mamba create -y -n "$ENV" python=3.10
+
+# Install conda packages
+${condaPkgs.length ? `mamba install -y -n "$ENV" ${chOpt} ${condaPkgs.join(" ")}` : `# no conda packages`}
+
+# Install pip packages
+${pipPkgs.length ? `mamba run -n "$ENV" pip install ${pipPkgs.join(" ")}` : `# no pip packages`}
+
+echo "Done. Activate via: conda activate $ENV"
+`;
+    }
+
+    function buildDockerSh(items){
+      const lines = [];
+      for (const it of items) {
+        const s = DB.find(x=>x.id===it.id); if(!s) continue;
+        const p = s.pkg||{};
+        if (p.docker_image) {
+          lines.push(`docker pull ${p.docker_image}${p.docker_tag?`:${p.docker_tag}`:""}`);
+        }
+      }
+      return lines.length ? `#!/usr/bin/env bash\nset -euo pipefail\n${lines.join("\n")}\n` : `#!/usr/bin/env bash\n# no docker images in selection\n`;
+    }
+
+    function download(name, text){
+      const blob = new Blob([text], {type:"text/plain;charset=utf-8"});
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 400);
+    }
+
+    // ---------------------------
+    // Wire up actions
+    // ---------------------------
+    function bindActions(){
+      $("#btnClear").addEventListener("click", ()=>{ PICK=[]; savePick(); renderPicked(); filter(); });
+      $("#btnYml").addEventListener("click", ()=>{
+        if (!PICK.length) return toast("清单为空");
+        const yml = buildYml($("#envName").value.trim(), PICK);
+        download("environment.yml", yml);
+      });
+      $("#btnBash").addEventListener("click", ()=>{
+        if (!PICK.length) return toast("清单为空");
+        const sh = buildInstallSh($("#envName").value.trim(), PICK);
+        download("install.sh", sh);
+      });
+      $("#btnDocker").addEventListener("click", ()=>{
+        if (!PICK.length) return toast("清单为空");
+        const sh = buildDockerSh(PICK);
+        download("docker_pull.sh", sh);
+      });
+      $("#btnCopy").addEventListener("click", ()=>{
+        if (!PICK.length) return toast("清单为空");
+        // Quick one-liner for mamba install (conda packages only)
+        const channels = new Set(["conda-forge","bioconda"]);
+        const pkgs = [];
+        for (const it of PICK) {
+          const s = DB.find(x=>x.id===it.id); if(!s) continue;
+          const p = s.pkg||{};
+          if (p.conda_pkg) { channels.add(...(p.conda_channels||[])); pkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:"")); }
+        }
+        if (!pkgs.length) return toast("所选均无 conda 包");
+        const chOpt = Array.from(channels).map(c=>`-c ${c}`).join(" ");
+        const cmd = `mamba install ${chOpt} ${pkgs.join(" ")}`;
+        navigator.clipboard.writeText(cmd).then(()=> toast("已复制 mamba 安装命令"));
+      });
+      // btnSave: 预留（登录后保存到 Firestore）；此处仅提示
+      $("#btnSave").addEventListener("click", ()=> toast("登录后可保存清单（后续接入 Firestore）"));
+    }
+
+    // ---------------------------
+    // Boot
+    // ---------------------------
+    async function boot(){
       [CATS, DB] = await Promise.all([
         loadJSON("../software_categories.json"),
         loadJSON("../software_index.json")
       ]);
-      renderCats();
-      filter();
+      // init UI
+      catEl.innerHTML = `<option value="">全部</option>` + CATS.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
+      $("#catPills").innerHTML = CATS.map(c=>`<button data-id="${c.id}" class="px-3 py-1 rounded-full border text-sm hover:bg-indigo-50">${c.name}</button>`).join("");
+      $("#catPills").querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ catEl.value=b.dataset.id; filter(); }));
       $("#btnSearch").addEventListener("click", filter);
       $("#btnReset").addEventListener("click", ()=>{ qEl.value=""; catEl.value=""; filter(); });
       qEl.addEventListener("keydown", e=>{ if(e.key==="Enter") filter(); });
+      bindActions();
+      renderPicked();
+      filter();
     }
     boot();
   </script>
