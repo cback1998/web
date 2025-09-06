@@ -298,6 +298,42 @@ echo "Done. Activate via: conda activate $ENV"
       filter();
     }
     boot();
+    <script type="module">
+// Minimal Firestore save (requires you already added Firebase Auth init somewhere, see previous step A)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+const firebaseConfig = { apiKey:"YOUR_API_KEY", authDomain:"YOUR_PROJECT_ID.firebaseapp.com", projectId:"YOUR_PROJECT_ID", appId:"YOUR_APP_ID" };
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const btnSave = document.querySelector("#btnSave");
+function toast(m){ const d=document.createElement("div"); d.className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl"; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),1200); }
+function pick(){ return JSON.parse(localStorage.getItem("gf_software_pick")||"[]"); }
+
+btnSave.addEventListener("click", async ()=>{
+  const u = auth.currentUser;
+  if (!u) return toast("请先登录");
+  const items = pick();
+  if (!items.length) return toast("清单为空");
+  try {
+    const name = (document.querySelector("#envName").value || "gf-env").trim();
+    await addDoc(collection(db, "software_bundles"), {
+      uid: u.uid, name, items,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    });
+    toast("已保存到账号");
+  } catch (e){ toast("保存失败: " + (e?.message||e)); }
+});
+
+onAuthStateChanged(auth, (u)=>{
+  btnSave.disabled = !u;
+  btnSave.classList.toggle("opacity-50", !u);
+});
+</script>
+
   </script>
 </body>
 </html>
