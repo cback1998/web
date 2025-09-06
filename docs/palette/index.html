@@ -23,7 +23,8 @@
           <p class="text-sm text-gray-600">预置/自定义色卡 · 出版级可用 · 一键导出 R / Python 代码</p>
         </div>
       </div>
-      <a href="/" class="text-indigo-600 underline">返回首页</a>
+      <!-- 修正这里：/ -> ../ -->
+      <a href="../" class="text-indigo-600 underline">返回首页</a>
     </header>
 
     <!-- Controls -->
@@ -160,7 +161,7 @@
     }
 
     // ------------------------------
-    // Color utilities (no abbreviation in comments)
+    // Color utilities
     // ------------------------------
     function hexToRgb(hex){
       const m = hex.replace("#","").match(/^([0-9a-f]{6})$/i);
@@ -196,7 +197,6 @@
       const out = [];
       for(let i=0;i<n;i++){
         const t = i/(n-1);
-        // find surrounding stops
         let k=0; while(k<stops.length-1 && t>stops[k+1][1]) k++;
         const [c1,t1] = stops[k], [c2,t2] = stops[Math.min(k+1,stops.length-1)];
         const localT = (t - t1) / Math.max(1e-9, (t2 - t1));
@@ -244,17 +244,13 @@
     function drawManhattan(colors){
       const ctx = cvM.getContext("2d"); ctx.clearRect(0,0,cvM.width,cvM.height);
       const W=cvM.width, H=cvM.height, pad=30;
-      // axes
       ctx.strokeStyle="#999"; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad); ctx.stroke();
-      // fake chromosomes and points
       const chrCount=22;
       const span=(W-2*pad)/chrCount;
-      // alternating background
       for(let c=0;c<chrCount;c++){
         if(c%2===0){ ctx.fillStyle="rgba(0,0,0,0.03)"; ctx.fillRect(pad+c*span, pad, span, H-2*pad); }
       }
-      // points
       const cA = colors[0]||"#1F78B4", cB = colors[1]||"#33A02C";
       for(let c=0;c<chrCount;c++){
         const color = (c%2===0)?cA:cB;
@@ -262,12 +258,11 @@
         const x0 = pad + c*span;
         for(let i=0;i<120;i++){
           const x = x0 + Math.random()*span;
-          const yv = Math.pow(Math.random(), 2); // more low p-values near axis
+          const yv = Math.pow(Math.random(), 2);
           const y = H-pad - yv*(H-2*pad);
           ctx.fillRect(x, y, 2, 2);
         }
       }
-      // y ticks
       ctx.fillStyle="#555"; ctx.font="12px system-ui";
       for(let i=0;i<=5;i++){ const y = H-pad - i*(H-2*pad)/5; ctx.fillText((i*2).toString(), 6, y+4); }
     }
@@ -275,7 +270,6 @@
     function drawPCA(colors){
       const ctx = cvP.getContext("2d"); ctx.clearRect(0,0,cvP.width,cvP.height);
       const W=cvP.width, H=cvP.height, pad=20;
-      // clusters equal to min(n, 8)
       const k = Math.min(colors.length, 8);
       const centers = Array.from({length:k}, ()=> [pad+Math.random()*(W-2*pad), pad+Math.random()*(H-2*pad)]);
       for(let c=0;c<k;c++){
@@ -288,7 +282,6 @@
           ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
         }
       }
-      // axes crosshair
       ctx.strokeStyle="#ccc"; ctx.beginPath(); ctx.moveTo(W/2, 8); ctx.lineTo(W/2, H-8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(8, H/2); ctx.lineTo(W-8, H/2); ctx.stroke();
     }
@@ -296,12 +289,10 @@
     function drawHeatmap(colors, type){
       const ctx = cvH.getContext("2d"); ctx.clearRect(0,0,cvH.width,cvH.height);
       const W=cvH.width, H=cvH.height, n=28, m=18;
-      // build gradient function from colors
       let grad = null;
       if(type==="categorical"){
         grad = t => colors[Math.floor(t*(colors.length-1))];
       } else {
-        // create stops evenly
         const stops = colors.map((c,i)=> [c, i/(colors.length-1)]);
         grad = t => {
           let k=0; while(k<stops.length-1 && t>stops[k+1][1]) k++;
@@ -313,8 +304,7 @@
       const cellW = W/n, cellH = H/m;
       for(let i=0;i<m;i++){
         for(let j=0;j<n;j++){
-          // synthetic value with smooth spatial variation
-          const v = (Math.sin(j*0.4)+Math.cos(i*0.5)+2)/4; // 0..1
+          const v = (Math.sin(j*0.4)+Math.cos(i*0.5)+2)/4;
           ctx.fillStyle = grad(v);
           ctx.fillRect(j*cellW, i*cellH, Math.ceil(cellW), Math.ceil(cellH));
         }
@@ -372,23 +362,27 @@
     // Events
     // ------------------------------
     function boot(){
-      fillPresetOptions(); // initial fill
-      typeSel.addEventListener("change", ()=>{ refreshPresetList(); buildFromPreset(); updateAll(); });
+      function opts(map){ return Object.keys(map).map(k=>`<option value="${k}">${k}</option>`).join(""); }
+      document.querySelector("#presetSel").innerHTML = opts(PRESETS_CATEGORICAL);
+      typeSel.addEventListener("change", ()=>{
+        const map = typeSel.value==="categorical" ? PRESETS_CATEGORICAL : (typeSel.value==="sequential" ? PRESETS_SEQUENTIAL : PRESETS_DIVERGING);
+        presetSel.innerHTML = Object.keys(map).map(k=>`<option value="${k}">${k}</option>`).join("");
+        buildFromPreset(); updateAll();
+      });
       presetSel.addEventListener("change", ()=>{ buildFromPreset(); updateAll(); });
-      $("#btnApply").addEventListener("click", ()=>{ buildFromPreset(); updateAll(); });
-      $("#btnShuffle").addEventListener("click", ()=>{
+      document.querySelector("#btnApply").addEventListener("click", ()=>{ buildFromPreset(); updateAll(); });
+      document.querySelector("#btnShuffle").addEventListener("click", ()=>{
         for(let i=PALETTE.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [PALETTE[i],PALETTE[j]]=[PALETTE[j],PALETTE[i]]; }
         updateAll();
       });
-      $("#copyR").addEventListener("click", ()=>{ navigator.clipboard.writeText(codeR.textContent).then(()=>toast("已复制 R 代码")); });
-      $("#copyPy").addEventListener("click", ()=>{ navigator.clipboard.writeText(codePy.textContent).then(()=>toast("已复制 Python 代码")); });
-      $("#btnDownloadJSON").addEventListener("click", ()=>{
+      document.querySelector("#copyR").addEventListener("click", ()=>{ navigator.clipboard.writeText(codeR.textContent).then(()=>toast("已复制 R 代码")); });
+      document.querySelector("#copyPy").addEventListener("click", ()=>{ navigator.clipboard.writeText(codePy.textContent).then(()=>toast("已复制 Python 代码")); });
+      document.querySelector("#btnDownloadJSON").addEventListener("click", ()=>{
         const blob = new Blob([JSON.stringify({type:typeSel.value, colors:PALETTE}, null, 2)], {type:"application/json"});
         const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "palette.json"; a.click();
         setTimeout(()=> URL.revokeObjectURL(a.href), 500);
       });
 
-      // initial state
       buildFromPreset(); updateAll();
     }
     boot();
