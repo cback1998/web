@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Palette Studio | 绘图色卡工作台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .chip{width:28px;height:28px;border-radius:9999px;border:1px solid rgba(0,0,0,0.08)}
+    canvas{image-rendering:optimizeSpeed}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-7xl mx-auto p-6 space-y-8">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
+        <div>
+          <h1 class="text-2xl font-semibold">Palette Studio</h1>
+          <p class="text-sm text-gray-600">预置/自定义色卡 · 出版级可用 · 一键导出 R / Python 代码</p>
+        </div>
+      </div>
+      <a href="/" class="text-indigo-600 underline">返回首页</a>
+    </header>
+
+    <!-- Controls -->
+    <section class="bg-white rounded-2xl shadow p-6 space-y-4">
+      <div class="grid lg:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">色卡类型</label>
+          <select id="typeSel" class="w-full border rounded-xl px-3 py-2">
+            <option value="categorical">离散（分类）</option>
+            <option value="sequential">渐变（顺序）</option>
+            <option value="diverging">发散（两端）</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">预置色卡</label>
+          <select id="presetSel" class="w-full border rounded-xl px-3 py-2"></select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">颜色数量（n）</label>
+          <input id="nColors" type="number" min="2" max="20" value="8" class="w-full border rounded-xl px-3 py-2" />
+        </div>
+        <div class="flex items-end gap-2">
+          <button id="btnApply" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">应用</button>
+          <button id="btnShuffle" class="px-4 py-2 rounded-xl border">随机顺序</button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2" id="chipRow"></div>
+
+      <div class="flex items-center gap-4 text-sm">
+        <div>最小对比度（WCAG）：<span id="minContrast" class="font-medium">—</span></div>
+        <div class="text-gray-500">建议 ≥ 3.0（小文本）或 ≥ 4.5（正文）</div>
+        <button id="btnDownloadJSON" class="ml-auto px-3 py-1.5 rounded-lg border">下载 .json</button>
+      </div>
+    </section>
+
+    <!-- Previews -->
+    <section class="grid lg:grid-cols-3 gap-5">
+      <!-- Manhattan -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium">Manhattan 预览</h3>
+          <div class="text-sm text-gray-500">交替染色体配色</div>
+        </div>
+        <canvas id="cvManhattan" width="640" height="280" class="mt-3 w-full rounded-xl border"></canvas>
+      </div>
+
+      <!-- PCA -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium">PCA 预览</h3>
+          <div class="text-sm text-gray-500">分类颜色</div>
+        </div>
+        <canvas id="cvPCA" width="640" height="280" class="mt-3 w-full rounded-xl border"></canvas>
+      </div>
+
+      <!-- Heatmap -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium">Heatmap 预览</h3>
+          <div class="text-sm text-gray-500">渐变或发散</div>
+        </div>
+        <canvas id="cvHeat" width="640" height="280" class="mt-3 w-full rounded-xl border"></canvas>
+      </div>
+    </section>
+
+    <!-- Export code -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <h3 class="text-lg font-medium">导出代码</h3>
+      <div class="mt-4 grid lg:grid-cols-2 gap-5">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm text-gray-600">R / ggplot2</div>
+            <button id="copyR" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white">复制</button>
+          </div>
+          <pre id="codeR" class="bg-gray-50 rounded-xl p-4 mono text-sm overflow-x-auto"></pre>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm text-gray-600">Python / matplotlib</div>
+            <button id="copyPy" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white">复制</button>
+          </div>
+          <pre id="codePy" class="bg-gray-50 rounded-xl p-4 mono text-sm overflow-x-auto"></pre>
+        </div>
+      </div>
+    </section>
+
+    <footer class="pt-2 text-xs text-gray-500">
+      <p>© 2025 Palette Studio · 预置色卡含 ggsci、ColorBrewer、viridis（整理版）</p>
+    </footer>
+  </div>
+
+  <script>
+    // ------------------------------
+    // Presets (public domain or re-mapped well-known palettes)
+    // ------------------------------
+
+    // Categorical presets: arrays of hex colors
+    const PRESETS_CATEGORICAL = {
+      "ggsci-npg": ["#E64B35","#4DBBD5","#00A087","#3C5488","#F39B7F","#8491B4","#91D1C2","#7E6148","#B09C85","#DC0000"],
+      "ggsci-lancet": ["#00468B","#ED0000","#42B540","#0099B4","#925E9F","#FDAF91","#AD002A","#ADB6B6","#1B1919"],
+      "brewer-Set1": ["#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#FFFF33","#A65628","#F781BF","#999999"],
+      "brewer-Paired": ["#A6CEE3","#1F78B4","#B2DF8A","#33A02C","#FB9A99","#E31A1C","#FDBF6F","#FF7F00","#CAB2D6","#6A3D9A","#FFFF99","#B15928"],
+      "science-friendly": ["#1F78B4","#33A02C","#E31A1C","#FF7F00","#6A3D9A","#B15928","#A6CEE3","#B2DF8A","#FB9A99","#FDBF6F"]
+    };
+
+    // Sequential presets: color stops for interpolation
+    const PRESETS_SEQUENTIAL = {
+      "viridis": [["#440154",0],["#31688E",0.33],["#35B779",0.66],["#FDE725",1]],
+      "brewer-Blues": [["#F7FBFF",0],["#6BAED6",0.6],["#08306B",1]],
+      "brewer-OrRd": [["#FFF7EC",0],["#FC8D59",0.6],["#7F0000",1]]
+    };
+
+    // Diverging presets: color stops
+    const PRESETS_DIVERGING = {
+      "brewer-RdBu": [["#B2182B",0],["#F7F7F7",0.5],["#2166AC",1]],
+      "brewer-PRGn": [["#762A83",0],["#F7F7F7",0.5],["#1B7837",1]]
+    };
+
+    // ------------------------------
+    // DOM helpers
+    // ------------------------------
+    const $ = s => document.querySelector(s);
+    const typeSel = $("#typeSel"), presetSel = $("#presetSel"), nColors = $("#nColors");
+    const chipRow = $("#chipRow"), minContrast = $("#minContrast");
+    const cvM = $("#cvManhattan"), cvP = $("#cvPCA"), cvH = $("#cvHeat");
+    const codeR = $("#codeR"), codePy = $("#codePy");
+
+    function toast(msg){
+      const d = document.createElement("div");
+      d.className = "fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl";
+      d.textContent = msg; document.body.appendChild(d);
+      setTimeout(()=> d.remove(), 1200);
+    }
+
+    // ------------------------------
+    // Color utilities (no abbreviation in comments)
+    // ------------------------------
+    function hexToRgb(hex){
+      const m = hex.replace("#","").match(/^([0-9a-f]{6})$/i);
+      if(!m) return {r:0,g:0,b:0};
+      const n = parseInt(m[1],16);
+      return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+    }
+    function rgbToHex(r,g,b){
+      const h = (1<<24) + (r<<16) + (g<<8) + b;
+      return "#" + h.toString(16).slice(1).toUpperCase();
+    }
+    function srgbToLin(c){ c = c/255; return c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+    function relLuminance(hex){
+      const {r,g,b} = hexToRgb(hex);
+      const R = srgbToLin(r), G = srgbToLin(g), B = srgbToLin(b);
+      return 0.2126*R + 0.7152*G + 0.0722*B;
+    }
+    function contrastRatio(h1,h2){
+      const L1 = relLuminance(h1), L2 = relLuminance(h2);
+      const [a,b] = L1>L2 ? [L1,L2] : [L2,L1];
+      return (a+0.05)/(b+0.05);
+    }
+    function linearInterpolate(a,b,t){ return a + (b-a)*t; }
+    function lerpColor(h1,h2,t){
+      const c1 = hexToRgb(h1), c2 = hexToRgb(h2);
+      const r = Math.round(linearInterpolate(c1.r, c2.r, t));
+      const g = Math.round(linearInterpolate(c1.g, c2.g, t));
+      const b = Math.round(linearInterpolate(c1.b, c2.b, t));
+      return rgbToHex(r,g,b);
+    }
+    function sampleStops(stops, n){
+      if(n<=2) return [stops[0][0], stops[stops.length-1][0]];
+      const out = [];
+      for(let i=0;i<n;i++){
+        const t = i/(n-1);
+        // find surrounding stops
+        let k=0; while(k<stops.length-1 && t>stops[k+1][1]) k++;
+        const [c1,t1] = stops[k], [c2,t2] = stops[Math.min(k+1,stops.length-1)];
+        const localT = (t - t1) / Math.max(1e-9, (t2 - t1));
+        out.push(lerpColor(c1,c2, Math.min(Math.max(localT,0),1)));
+      }
+      return out;
+    }
+
+    // ------------------------------
+    // UI renderers
+    // ------------------------------
+    function fillPresetOptions(){
+      function opts(map){ return Object.keys(map).map(k=>`<option value="${k}">${k}</option>`).join(""); }
+      presetSel.innerHTML = opts(PRESETS_CATEGORICAL);
+    }
+    function refreshPresetList(){
+      const t = typeSel.value;
+      const map = t==="categorical" ? PRESETS_CATEGORICAL : (t==="sequential" ? PRESETS_SEQUENTIAL : PRESETS_DIVERGING);
+      presetSel.innerHTML = Object.keys(map).map(k=>`<option value="${k}">${k}</option>`).join("");
+    }
+    function renderChips(colors){
+      chipRow.innerHTML = colors.map((c,i)=>`
+        <div class="flex items-center gap-2">
+          <div class="chip" style="background:${c}"></div>
+          <input data-idx="${i}" type="text" value="${c}" class="w-28 border rounded-lg px-2 py-1 mono text-xs" />
+        </div>`).join("");
+      chipRow.querySelectorAll("input").forEach(inp=>{
+        inp.addEventListener("change",()=> { PALETTE[parseInt(inp.dataset.idx)] = inp.value.trim(); updateAll(); });
+      });
+    }
+    function computeMinContrast(colors){
+      let min = Infinity;
+      for(let i=0;i<colors.length;i++){
+        for(let j=i+1;j<colors.length;j++){
+          const cr = contrastRatio(colors[i], colors[j]);
+          if(cr<min) min = cr;
+        }
+      }
+      return colors.length>1 ? min : 0;
+    }
+
+    // ------------------------------
+    // Preview painters
+    // ------------------------------
+    function drawManhattan(colors){
+      const ctx = cvM.getContext("2d"); ctx.clearRect(0,0,cvM.width,cvM.height);
+      const W=cvM.width, H=cvM.height, pad=30;
+      // axes
+      ctx.strokeStyle="#999"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad); ctx.stroke();
+      // fake chromosomes and points
+      const chrCount=22;
+      const span=(W-2*pad)/chrCount;
+      // alternating background
+      for(let c=0;c<chrCount;c++){
+        if(c%2===0){ ctx.fillStyle="rgba(0,0,0,0.03)"; ctx.fillRect(pad+c*span, pad, span, H-2*pad); }
+      }
+      // points
+      const cA = colors[0]||"#1F78B4", cB = colors[1]||"#33A02C";
+      for(let c=0;c<chrCount;c++){
+        const color = (c%2===0)?cA:cB;
+        ctx.fillStyle=color;
+        const x0 = pad + c*span;
+        for(let i=0;i<120;i++){
+          const x = x0 + Math.random()*span;
+          const yv = Math.pow(Math.random(), 2); // more low p-values near axis
+          const y = H-pad - yv*(H-2*pad);
+          ctx.fillRect(x, y, 2, 2);
+        }
+      }
+      // y ticks
+      ctx.fillStyle="#555"; ctx.font="12px system-ui";
+      for(let i=0;i<=5;i++){ const y = H-pad - i*(H-2*pad)/5; ctx.fillText((i*2).toString(), 6, y+4); }
+    }
+
+    function drawPCA(colors){
+      const ctx = cvP.getContext("2d"); ctx.clearRect(0,0,cvP.width,cvP.height);
+      const W=cvP.width, H=cvP.height, pad=20;
+      // clusters equal to min(n, 8)
+      const k = Math.min(colors.length, 8);
+      const centers = Array.from({length:k}, ()=> [pad+Math.random()*(W-2*pad), pad+Math.random()*(H-2*pad)]);
+      for(let c=0;c<k;c++){
+        ctx.fillStyle = colors[c];
+        for(let i=0;i<70;i++){
+          const [cx,cy]=centers[c];
+          const ang = Math.random()*Math.PI*2;
+          const rad = Math.random()*24;
+          const x = cx + Math.cos(ang)*rad, y = cy + Math.sin(ang)*rad;
+          ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
+        }
+      }
+      // axes crosshair
+      ctx.strokeStyle="#ccc"; ctx.beginPath(); ctx.moveTo(W/2, 8); ctx.lineTo(W/2, H-8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(8, H/2); ctx.lineTo(W-8, H/2); ctx.stroke();
+    }
+
+    function drawHeatmap(colors, type){
+      const ctx = cvH.getContext("2d"); ctx.clearRect(0,0,cvH.width,cvH.height);
+      const W=cvH.width, H=cvH.height, n=28, m=18;
+      // build gradient function from colors
+      let grad = null;
+      if(type==="categorical"){
+        grad = t => colors[Math.floor(t*(colors.length-1))];
+      } else {
+        // create stops evenly
+        const stops = colors.map((c,i)=> [c, i/(colors.length-1)]);
+        grad = t => {
+          let k=0; while(k<stops.length-1 && t>stops[k+1][1]) k++;
+          const [c1,t1]=stops[k], [c2,t2]=stops[Math.min(k+1,stops.length-1)];
+          const local=(t-t1)/Math.max(1e-9,(t2-t1));
+          return lerpColor(c1,c2, Math.min(Math.max(local,0),1));
+        };
+      }
+      const cellW = W/n, cellH = H/m;
+      for(let i=0;i<m;i++){
+        for(let j=0;j<n;j++){
+          // synthetic value with smooth spatial variation
+          const v = (Math.sin(j*0.4)+Math.cos(i*0.5)+2)/4; // 0..1
+          ctx.fillStyle = grad(v);
+          ctx.fillRect(j*cellW, i*cellH, Math.ceil(cellW), Math.ceil(cellH));
+        }
+      }
+    }
+
+    // ------------------------------
+    // Code exporters
+    // ------------------------------
+    function rCode(colors, type){
+      if(type==="categorical"){
+        return `# Discrete palette\nscale_color_manual(values = c(${colors.map(c=>`"${c}"`).join(", ")}))\n# Or\nscale_fill_manual(values = c(${colors.map(c=>`"${c}"`).join(", ")}))`;
+      } else {
+        return `# Gradient or diverging palette\nscale_fill_gradientn(colors = c(${colors.map(c=>`"${c}"`).join(", ")}))\n# For line or points\nscale_color_gradientn(colors = c(${colors.map(c=>`"${c}"`).join(", ")}))`;
+      }
+    }
+    function pyCode(colors, type){
+      if(type==="categorical"){
+        return `# Discrete palette\nfrom matplotlib.colors import ListedColormap\ncmap = ListedColormap([${colors.map(c=>`"${c}"`).join(", ")}])\n# Example\n# plt.scatter(x, y, c=labels, cmap=cmap)`;
+      } else {
+        return `# Gradient or diverging palette\nfrom matplotlib.colors import LinearSegmentedColormap\ncmap = LinearSegmentedColormap.from_list("custom", [${colors.map(c=>`"${c}"`).join(", ")}])\n# Example\n# plt.imshow(Z, cmap=cmap)`;
+      }
+    }
+
+    // ------------------------------
+    // State and actions
+    // ------------------------------
+    let PALETTE = [];
+    function buildFromPreset(){
+      const t = typeSel.value;
+      const key = presetSel.value;
+      const n = parseInt(nColors.value||"8",10);
+      if(t==="categorical"){
+        const base = PRESETS_CATEGORICAL[key]||PRESETS_CATEGORICAL["ggsci-npg"];
+        PALETTE = base.slice(0, Math.min(n, base.length));
+      } else if(t==="sequential"){
+        const stops = PRESETS_SEQUENTIAL[key]||PRESETS_SEQUENTIAL["viridis"];
+        PALETTE = sampleStops(stops, n);
+      } else {
+        const stops = PRESETS_DIVERGING[key]||PRESETS_DIVERGING["brewer-RdBu"];
+        PALETTE = sampleStops(stops, n);
+      }
+    }
+    function updateAll(){
+      renderChips(PALETTE);
+      minContrast.textContent = (computeMinContrast(PALETTE)||0).toFixed(2);
+      drawManhattan(PALETTE);
+      drawPCA(PALETTE);
+      drawHeatmap(PALETTE, typeSel.value);
+      codeR.textContent = rCode(PALETTE, typeSel.value);
+      codePy.textContent = pyCode(PALETTE, typeSel.value);
+    }
+
+    // ------------------------------
+    // Events
+    // ------------------------------
+    function boot(){
+      fillPresetOptions(); // initial fill
+      typeSel.addEventListener("change", ()=>{ refreshPresetList(); buildFromPreset(); updateAll(); });
+      presetSel.addEventListener("change", ()=>{ buildFromPreset(); updateAll(); });
+      $("#btnApply").addEventListener("click", ()=>{ buildFromPreset(); updateAll(); });
+      $("#btnShuffle").addEventListener("click", ()=>{
+        for(let i=PALETTE.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [PALETTE[i],PALETTE[j]]=[PALETTE[j],PALETTE[i]]; }
+        updateAll();
+      });
+      $("#copyR").addEventListener("click", ()=>{ navigator.clipboard.writeText(codeR.textContent).then(()=>toast("已复制 R 代码")); });
+      $("#copyPy").addEventListener("click", ()=>{ navigator.clipboard.writeText(codePy.textContent).then(()=>toast("已复制 Python 代码")); });
+      $("#btnDownloadJSON").addEventListener("click", ()=>{
+        const blob = new Blob([JSON.stringify({type:typeSel.value, colors:PALETTE}, null, 2)], {type:"application/json"});
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "palette.json"; a.click();
+        setTimeout(()=> URL.revokeObjectURL(a.href), 500);
+      });
+
+      // initial state
+      buildFromPreset(); updateAll();
+    }
+    boot();
+  </script>
+</body>
+</html>
