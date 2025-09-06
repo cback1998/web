@@ -1,0 +1,9 @@
+[
+  {"id":"qc","name":"质控与格式转换","examples":["fastp","bcftools","seqkit"]},
+  {"id":"population","name":"群体遗传学","examples":["PLINK","ADMIXTURE","TreeMix","SMC++","Dsuite","ANGSD"]},
+  {"id":"selection","name":"选择扫描","examples":["XP-CLR","selscan(iHS/XP-EHH)","RAiSD"]},
+  {"id":"phylogeny","name":"系统发育","examples":["IQ-TREE","RAxML-NG","FastTree"]},
+  {"id":"annotation","name":"注释与功能","examples":["bcftools csq","SnpEff","VEP"]},
+  {"id":"ld_haplotype","name":"LD与单倍型","examples":["LDBlockShow","Beagle","Haploview"]},
+  {"id":"demography","name":"群体史/时间","examples":["SMC++","PSMC","dadi","fastsimcoal2"]}
+]
