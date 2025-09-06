@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PLINK | 组学软件详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-3xl mx-auto p-6 space-y-8">
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/software" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
+        <div>
+          <h1 class="text-2xl font-semibold" id="title">PLINK</h1>
+          <p class="text-sm text-gray-600" id="subtitle">群体遗传 · PCA/QC/LD/IBD</p>
+        </div>
+      </div>
+      <a href="/software" class="text-indigo-600 underline">返回列表</a>
+    </header>
+
+    <!-- Desc -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <p id="desc" class="text-sm text-gray-700">经典 GWAS/群体遗传工具，支持 PCA、QC、LD、IBD 等。</p>
+      <div class="mt-3 text-xs text-gray-500" id="meta">语言：C++ · 系统：Linux/macOS/Windows</div>
+    </section>
+
+    <!-- Install tabs -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <h3 class="text-lg font-medium">安装方式</h3>
+      <div class="mt-3 border-b flex items-center gap-4 text-sm" id="tabs"></div>
+      <div id="installPanel" class="mt-4"></div>
+    </section>
+
+    <!-- Minimal usage -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <h3 class="text-lg font-medium">最小示例</h3>
+      <div id="usageList" class="mt-3 space-y-3"></div>
+    </section>
+
+    <!-- Gotchas -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <h3 class="text-lg font-medium">常见问题与解决</h3>
+      <ul id="gotchaList" class="mt-3 space-y-2 list-disc pl-5"></ul>
+    </section>
+
+    <!-- Links -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <h3 class="text-lg font-medium">链接</h3>
+      <ul id="linkList" class="mt-3 space-y-2 text-sm"></ul>
+    </section>
+
+    <footer class="pt-2 text-xs text-gray-500">© 2025 Genome Finder</footer>
+  </div>
+
+  <script>
+    // Utility
+    const $ = s=>document.querySelector(s);
+    function copy(text){
+      navigator.clipboard.writeText(text).then(()=> toast("已复制"));
+    }
+    function toast(msg){
+      const d = document.createElement("div");
+      d.className = "fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl";
+      d.textContent = msg; document.body.appendChild(d);
+      setTimeout(()=> d.remove(), 1200);
+    }
+
+    async function loadJSON(path){ const r = await fetch(path); if(!r.ok) throw new Error(path); return r.json(); }
+    function getIdFromPath(){
+      const m = location.pathname.match(/\/software\/([A-Za-z0-9_\-]+)\.html$/);
+      return m ? m[1] : "plink";
+    }
+
+    function renderInstall(inst){
+      const entries = Object.entries(inst).filter(([k,v])=>v && v.trim());
+      const tabBox = $("#tabs"), panel = $("#installPanel");
+      tabBox.innerHTML = entries.map(([k])=>`<button data-k="${k}" class="px-3 py-2 -mb-px border-b-2 border-transparent hover:border-indigo-300">${k}</button>`).join("");
+      function show(k){
+        const cmd = inst[k];
+        panel.innerHTML = `
+          <div class="bg-gray-50 rounded-xl p-4 mono text-sm overflow-x-auto">${cmd.replace(/</g,"&lt;")}</div>
+          <div class="mt-3 flex items-center gap-3">
+            <button class="px-4 py-2 rounded-xl bg-indigo-600 text-white" id="btnCopy">复制命令</button>
+            <span class="text-xs text-gray-500">选择不同 Tab 以查看其它安装方式</span>
+          </div>`;
+        $("#btnCopy").addEventListener("click", ()=> copy(cmd));
+        tabBox.querySelectorAll("button").forEach(b=> b.classList.toggle("border-indigo-600", b.dataset.k===k));
+      }
+      const first = entries[0]?.[0]; if(first) show(first);
+      tabBox.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=> show(b.dataset.k)));
+    }
+
+    function codeBlock(cmd){ return `<pre class="bg-gray-50 rounded-xl p-4 mono text-sm overflow-x-auto">${cmd.replace(/</g,"&lt;")}</pre>`; }
+
+    async function boot(){
+      const id = getIdFromPath();
+      const DB = await loadJSON("../software_index.json");
+      const s = DB.find(x=>x.id === id);
+      if(!s){ document.body.innerHTML = '<div class="p-6">未找到该软件。</div>'; return; }
+
+      $("#title").textContent = s.name;
+      $("#subtitle").textContent = (s.category||[]).join(" · ");
+      $("#desc").textContent = s.desc || "";
+      $("#meta").textContent = `语言：${(s.langs||[]).join("/")} · 系统：${(s.os||[]).join("/")}`;
+
+      renderInstall(s.install||{});
+      $("#usageList").innerHTML = (s.usage_min||[]).map(codeBlock).join("");
+      $("#gotchaList").innerHTML = (s.gotchas||[]).map(g=>`<li><span class="font-medium">${g.msg}</span> — ${g.fix}</li>`).join("");
+      const links = s.links||{};
+      $("#linkList").innerHTML = Object.entries(links).map(([k,v])=>{
+        const label = k.toUpperCase();
+        return `<li><a class="text-indigo-600 underline" href="${v}" target="_blank" rel="noreferrer">${label}</a></li>`;
+      }).join("");
+    }
+    boot();
+  </script>
+</body>
+</html>
