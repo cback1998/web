@@ -13,13 +13,14 @@
     <!-- Header -->
     <header class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <a href="/" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
+        <!-- 动态首页链接：给 id，脚本里设置 -->
+        <a id="logoLink" href="#" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
         <div>
           <h1 class="text-2xl font-semibold">组学软件</h1>
           <p class="text-sm text-gray-600">按任务分类查找 · 勾选生成安装清单</p>
         </div>
       </div>
-      <a href="../" class="text-indigo-600 underline">返回首页</a>
+      <a id="homeLink" href="#" class="text-indigo-600 underline">返回首页</a>
     </header>
 
     <!-- Filters -->
@@ -38,6 +39,7 @@
       <div class="mt-4 flex items-center gap-3">
         <button id="btnSearch" class="px-5 py-2 rounded-xl bg-indigo-600 text-white">筛选</button>
         <button id="btnReset" class="px-5 py-2 rounded-xl border">重置</button>
+        <span class="text-xs text-gray-500">支持 URL 参数：<code>?q=plink</code> 或 <code>?highlight=plink</code></span>
       </div>
     </section>
 
@@ -66,7 +68,7 @@
           <button id="btnDocker" class="px-3 py-2 rounded-xl border">导出 docker_pull.sh</button>
           <button id="btnCopy" class="px-3 py-2 rounded-xl border">复制 mamba 安装行</button>
         </div>
-        <!-- Optional: save bundle (仅登录后生效；可稍后接入 Firestore) -->
+        <!-- Optional: save bundle（登录后生效；后续接入 Firestore） -->
         <button id="btnSave" class="mt-3 w-full px-3 py-2 rounded-xl border">保存为我的清单（登录后）</button>
         <p class="text-xs text-gray-500 mt-2">提示：首选 mamba + bioconda/conda-forge；没有 conda 包的会落到 pip 或仅给源码链接。</p>
       </aside>
@@ -77,7 +79,20 @@
     </footer>
   </div>
 
+  <!-- 业务脚本（非模块） -->
   <script>
+    // ---------- 动态首页链接（兼容 github.io 项目站 / 自定义域） ----------
+    (function () {
+      const segs = location.pathname.split('/').filter(Boolean);
+      const repo = segs.length ? segs[0] : "";
+      const isProject = location.hostname.endsWith('github.io') && !!repo;
+      const home = isProject ? `/${repo}/` : '/';
+      const homeLink = document.getElementById('homeLink');
+      const logoLink = document.getElementById('logoLink');
+      if (homeLink) homeLink.setAttribute('href', home);
+      if (logoLink) logoLink.setAttribute('href', home);
+    })();
+
     // ---------------------------
     // Load data
     // ---------------------------
@@ -110,13 +125,14 @@
     }
 
     function card(s) {
-      const cats = s.category.map(id => (CATS.find(c=>c.id===id)?.name||id)).join(" · ");
+      const cats = (Array.isArray(s.category)?s.category:[s.category]).map(id => (CATS.find(c=>c.id===id)?.name||id)).join(" · ");
       const checked = isPicked(s.id) ? 'checked' : '';
+      // 标题不再跳转到不存在的详情页；改为本页定位 highight
       return `
-      <div class="bg-white rounded-2xl shadow p-5">
+      <div class="bg-white rounded-2xl shadow p-5" id="${s.id}">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <a href="/software/${s.id}.html" class="text-lg font-medium underline decoration-indigo-600">${s.name}</a>
+            <a href="./?highlight=${encodeURIComponent(s.id)}" class="text-lg font-medium underline decoration-indigo-600">${s.name}</a>
             <p class="text-sm text-gray-600 mt-1">${s.desc||""}</p>
             <p class="text-xs text-gray-500 mt-2">分类：${cats}</p>
           </div>
@@ -133,7 +149,8 @@
       const kw = (qEl.value||"").trim().toLowerCase();
       const cid = catEl.value;
       const rows = DB.filter(s=>{
-        const inCat = !cid || s.category.includes(cid);
+        const cats = Array.isArray(s.category)?s.category:[s.category];
+        const inCat = !cid || cats.includes(cid);
         const inKw = !kw || (s.name.toLowerCase().includes(kw) || (s.desc||"").toLowerCase().includes(kw));
         return inCat && inKw;
       });
@@ -146,7 +163,7 @@
     function renderPicked(){
       pickedUl.innerHTML = PICK.length ? PICK.map(it=>`
         <li class="flex items-center justify-between gap-2">
-          <a class="underline text-indigo-600" href="/software/${it.id}.html">${it.name}</a>
+          <a class="underline text-indigo-600" href="./?highlight=${encodeURIComponent(it.id)}">${it.name}</a>
           <button data-id="${it.id}" class="text-xs text-red-600">移除</button>
         </li>`).join("") : `<li class="text-gray-500">尚未选择</li>`;
       pickedUl.querySelectorAll("button").forEach(btn=> btn.addEventListener("click", ()=>{ togglePick(btn.dataset.id); filter(); }));
@@ -156,18 +173,16 @@
     // Exporters
     // ---------------------------
     function buildYml(env, items){
-      // Collect conda packages and channels
       const pkgs = [];
-      const channels = new Set(["conda-forge","bioconda"]); // default safe order
+      const channels = new Set(["conda-forge","bioconda"]);
       for (const it of items) {
         const s = DB.find(x=>x.id===it.id); if(!s) continue;
         const p = s.pkg||{};
         if (p.conda_pkg) {
-          channels.add(...(p.conda_channels||[]));
+          (p.conda_channels||[]).forEach(c=>channels.add(c));
           pkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:""));
         }
       }
-      // Pip fallback
       const pipPkgs = [];
       for (const it of items) {
         const s = DB.find(x=>x.id===it.id); if(!s) continue;
@@ -177,13 +192,11 @@
         }
       }
       const yml = {
-        name: env || "gf-env",
+        name: (env||"gf-env"),
         channels: Array.from(channels),
         dependencies: pkgs.length ? pkgs : ["python>=3.10"]
       };
-      if (pipPkgs.length) {
-        yml.dependencies.push({ pip: pipPkgs });
-      }
+      if (pipPkgs.length) yml.dependencies.push({ pip: pipPkgs });
       return `name: ${yml.name}
 channels:
 ${yml.channels.map(c=>`  - ${c}`).join("\n")}
@@ -193,14 +206,13 @@ ${yml.dependencies.map(d=> typeof d==="string" ? `  - ${d}` : `  - pip:\n${d.pip
     }
 
     function buildInstallSh(env, items){
-      const ymlName = `${env||"gf-env"}.yml`;
       const condaPkgs = [];
       const channels = new Set(["conda-forge","bioconda"]);
       const pipPkgs = [];
       for (const it of items) {
         const s = DB.find(x=>x.id===it.id); if(!s) continue;
         const p = s.pkg||{};
-        if (p.conda_pkg) { channels.add(...(p.conda_channels||[])); condaPkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:"")); }
+        if (p.conda_pkg) { (p.conda_channels||[]).forEach(c=>channels.add(c)); condaPkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:"")); }
         else if (p.pip_pkg) { pipPkgs.push(p.pip_pkg + (p.pip_ver?`==${p.pip_ver}`:"")); }
       }
       const chOpt = Array.from(channels).map(c=>`-c ${c}`).join(" ");
@@ -208,15 +220,9 @@ ${yml.dependencies.map(d=> typeof d==="string" ? `  - ${d}` : `  - pip:\n${d.pip
 set -euo pipefail
 ENV="${env||"gf-env"}"
 
-# Create env if not exists
 mamba env list | grep -q "^$ENV\\s" || mamba create -y -n "$ENV" python=3.10
-
-# Install conda packages
 ${condaPkgs.length ? `mamba install -y -n "$ENV" ${chOpt} ${condaPkgs.join(" ")}` : `# no conda packages`}
-
-# Install pip packages
 ${pipPkgs.length ? `mamba run -n "$ENV" pip install ${pipPkgs.join(" ")}` : `# no pip packages`}
-
 echo "Done. Activate via: conda activate $ENV"
 `;
     }
@@ -226,9 +232,7 @@ echo "Done. Activate via: conda activate $ENV"
       for (const it of items) {
         const s = DB.find(x=>x.id===it.id); if(!s) continue;
         const p = s.pkg||{};
-        if (p.docker_image) {
-          lines.push(`docker pull ${p.docker_image}${p.docker_tag?`:${p.docker_tag}`:""}`);
-        }
+        if (p.docker_image) lines.push(`docker pull ${p.docker_image}${p.docker_tag?`:${p.docker_tag}`:""}`);
       }
       return lines.length ? `#!/usr/bin/env bash\nset -euo pipefail\n${lines.join("\n")}\n` : `#!/usr/bin/env bash\n# no docker images in selection\n`;
     }
@@ -244,37 +248,23 @@ echo "Done. Activate via: conda activate $ENV"
     // ---------------------------
     function bindActions(){
       $("#btnClear").addEventListener("click", ()=>{ PICK=[]; savePick(); renderPicked(); filter(); });
-      $("#btnYml").addEventListener("click", ()=>{
-        if (!PICK.length) return toast("清单为空");
-        const yml = buildYml($("#envName").value.trim(), PICK);
-        download("environment.yml", yml);
-      });
-      $("#btnBash").addEventListener("click", ()=>{
-        if (!PICK.length) return toast("清单为空");
-        const sh = buildInstallSh($("#envName").value.trim(), PICK);
-        download("install.sh", sh);
-      });
-      $("#btnDocker").addEventListener("click", ()=>{
-        if (!PICK.length) return toast("清单为空");
-        const sh = buildDockerSh(PICK);
-        download("docker_pull.sh", sh);
-      });
+      $("#btnYml").addEventListener("click", ()=>{ if (!PICK.length) return toast("清单为空"); download("environment.yml", buildYml($("#envName").value.trim(), PICK)); });
+      $("#btnBash").addEventListener("click", ()=>{ if (!PICK.length) return toast("清单为空"); download("install.sh", buildInstallSh($("#envName").value.trim(), PICK)); });
+      $("#btnDocker").addEventListener("click", ()=>{ if (!PICK.length) return toast("清单为空"); download("docker_pull.sh", buildDockerSh(PICK)); });
       $("#btnCopy").addEventListener("click", ()=>{
         if (!PICK.length) return toast("清单为空");
-        // Quick one-liner for mamba install (conda packages only)
         const channels = new Set(["conda-forge","bioconda"]);
         const pkgs = [];
         for (const it of PICK) {
           const s = DB.find(x=>x.id===it.id); if(!s) continue;
           const p = s.pkg||{};
-          if (p.conda_pkg) { channels.add(...(p.conda_channels||[])); pkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:"")); }
+          if (p.conda_pkg) { (p.conda_channels||[]).forEach(c=>channels.add(c)); pkgs.push(p.conda_pkg + (p.conda_ver?`=${p.conda_ver}`:"")); }
         }
         if (!pkgs.length) return toast("所选均无 conda 包");
         const chOpt = Array.from(channels).map(c=>`-c ${c}`).join(" ");
         const cmd = `mamba install ${chOpt} ${pkgs.join(" ")}`;
         navigator.clipboard.writeText(cmd).then(()=> toast("已复制 mamba 安装命令"));
       });
-      // btnSave: 预留（登录后保存到 Firestore）；此处仅提示
       $("#btnSave").addEventListener("click", ()=> toast("登录后可保存清单（后续接入 Firestore）"));
     }
 
@@ -287,53 +277,53 @@ echo "Done. Activate via: conda activate $ENV"
         loadJSON("../software_index.json")
       ]);
       // init UI
-      catEl.innerHTML = `<option value="">全部</option>` + CATS.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
-      $("#catPills").innerHTML = CATS.map(c=>`<button data-id="${c.id}" class="px-3 py-1 rounded-full border text-sm hover:bg-indigo-50">${c.name}</button>`).join("");
-      $("#catPills").querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{ catEl.value=b.dataset.id; filter(); }));
+      renderCats();
       $("#btnSearch").addEventListener("click", filter);
       $("#btnReset").addEventListener("click", ()=>{ qEl.value=""; catEl.value=""; filter(); });
       qEl.addEventListener("keydown", e=>{ if(e.key==="Enter") filter(); });
       bindActions();
       renderPicked();
       filter();
+
+      // 解析 URL 参数（q / highlight）
+      const url = new URL(location.href);
+      const q = (url.searchParams.get("q")||"").trim();
+      const hi = (url.searchParams.get("highlight")||"").trim();
+      if (q) { qEl.value = q; filter(); }
+      const target = hi || q;
+      if (target) {
+        const el = document.getElementById(target.toLowerCase());
+        if (el) { el.scrollIntoView({behavior:"smooth", block:"start"}); el.classList.add("ring","ring-indigo-300"); }
+      }
     }
     boot();
-    <script type="module">
-// Minimal Firestore save (requires you already added Firebase Auth init somewhere, see previous step A)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+  </script>
 
-const firebaseConfig = { apiKey:"YOUR_API_KEY", authDomain:"YOUR_PROJECT_ID.firebaseapp.com", projectId:"YOUR_PROJECT_ID", appId:"YOUR_APP_ID" };
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-const btnSave = document.querySelector("#btnSave");
-function toast(m){ const d=document.createElement("div"); d.className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl"; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),1200); }
-function pick(){ return JSON.parse(localStorage.getItem("gf_software_pick")||"[]"); }
-
-btnSave.addEventListener("click", async ()=>{
-  const u = auth.currentUser;
-  if (!u) return toast("请先登录");
-  const items = pick();
-  if (!items.length) return toast("清单为空");
-  try {
-    const name = (document.querySelector("#envName").value || "gf-env").trim();
-    await addDoc(collection(db, "software_bundles"), {
-      uid: u.uid, name, items,
-      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-    });
-    toast("已保存到账号");
-  } catch (e){ toast("保存失败: " + (e?.message||e)); }
-});
-
-onAuthStateChanged(auth, (u)=>{
-  btnSave.disabled = !u;
-  btnSave.classList.toggle("opacity-50", !u);
-});
-</script>
-
+  <!-- Firebase 相关（可选）：单独的模块脚本；不要嵌在上面的 <script> 里 -->
+  <script type="module">
+    // 如未接入可留空或注释此段。接入时替换为你的配置。
+    // import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    // import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    // import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+    // const firebaseConfig = { apiKey:"YOUR_API_KEY", authDomain:"YOUR_PROJECT_ID.firebaseapp.com", projectId:"YOUR_PROJECT_ID", appId:"YOUR_APP_ID" };
+    // const app = initializeApp(firebaseConfig);
+    // const auth = getAuth(app);
+    // const db = getFirestore(app);
+    // const btnSave = document.querySelector("#btnSave");
+    // function toast(m){ const d=document.createElement("div"); d.className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl"; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),1200); }
+    // function pick(){ return JSON.parse(localStorage.getItem("gf_software_pick")||"[]"); }
+    // btnSave?.addEventListener("click", async ()=>{
+    //   const u = auth.currentUser;
+    //   if (!u) return toast("请先登录");
+    //   const items = pick();
+    //   if (!items.length) return toast("清单为空");
+    //   try {
+    //     const name = (document.querySelector("#envName").value || "gf-env").trim();
+    //     await addDoc(collection(db, "software_bundles"), { uid: u.uid, name, items, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    //     toast("已保存到账号");
+    //   } catch (e){ toast("保存失败: " + (e?.message||e)); }
+    // });
+    // onAuthStateChanged(auth, (u)=>{ btnSave.disabled = !u; btnSave.classList.toggle("opacity-50", !u); });
   </script>
 </body>
 </html>
