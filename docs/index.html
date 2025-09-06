@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Genome Finder | 生信门户首页</title>
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-7xl mx-auto p-6 space-y-8">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</div>
+        <div>
+          <h1 class="text-2xl font-semibold">Genome Finder</h1>
+          <p class="text-sm text-gray-600">检索参考基因组 · 组学软件 · 绘图色卡 · 个人工作台</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-3" id="authArea">
+        <!-- Auth buttons will toggle by JS -->
+        <button id="btnLogin" class="px-4 py-2 rounded-xl border">登录</button>
+        <button id="btnRegister" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">注册</button>
+      </nav>
+    </header>
+
+    <!-- Unified Search -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <label class="block text-sm text-gray-600 mb-2">统一搜索（物种/学名/TaxID · 工具名/关键词 · 色卡名）</label>
+      <div class="flex flex-col md:flex-row gap-3">
+        <input id="q" type="text" placeholder="例如：Equus asinus / PLINK / viridis"
+               class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <select id="scope" class="border rounded-xl px-3 py-2">
+          <option value="auto">自动</option>
+          <option value="genome">参考基因组</option>
+          <option value="software">组学软件</option>
+          <option value="palette">绘图色卡</option>
+        </select>
+        <button id="btnSearch" class="px-5 py-2 rounded-xl bg-indigo-600 text-white">搜索</button>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">提示：输入“驴 / donkey / Equus asinus”均可；输入“PLINK / ADMIXTURE / XP-CLR”等可直达软件。</p>
+    </section>
+
+    <!-- Primary Feature Cards -->
+    <section class="grid md:grid-cols-3 gap-5">
+      <!-- Genome -->
+      <a href="/genome" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
+        <h3 class="text-lg font-medium">参考基因组检索</h3>
+        <p class="text-sm text-gray-600 mt-1">中文/英文/拉丁名 → NCBI/Ensembl 最新装配与注释</p>
+        <div class="mt-4 inline-flex items-center gap-2 text-indigo-600">进入<span>→</span></div>
+      </a>
+      <!-- Software -->
+      <a href="/software" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
+        <h3 class="text-lg font-medium">组学软件推荐</h3>
+        <p class="text-sm text-gray-600 mt-1">按任务分类：PCA、群体结构、选择扫描、系统发育等</p>
+        <div class="mt-4 inline-flex items-center gap-2 text-indigo-600">进入<span>→</span></div>
+      </a>
+      <!-- Palette -->
+      <a href="/palette" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
+        <h3 class="text-lg font-medium">绘图色卡工作台</h3>
+        <p class="text-sm text-gray-600 mt-1">预置/自定义色卡 · 色盲模拟 · 一键导出 R/Python 代码</p>
+        <div class="mt-4 inline-flex items-center gap-2 text-indigo-600">进入<span>→</span></div>
+      </a>
+    </section>
+
+    <!-- User Quick Area -->
+    <section class="grid lg:grid-cols-3 gap-5">
+      <!-- My Shortcuts -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium">我的快捷入口</h3>
+          <button class="text-sm text-indigo-600" id="btnEditShortcuts">管理</button>
+        </div>
+        <ul id="shortcutList" class="mt-3 text-sm text-gray-700 space-y-2">
+          <!-- Filled by JS; sample placeholders -->
+          <li><a class="underline text-indigo-600" href="/genome?species=Equus%20asinus">Equus asinus · 基因组</a></li>
+          <li><a class="underline text-indigo-600" href="/software?highlight=plink">PLINK · 软件</a></li>
+          <li><a class="underline text-indigo-600" href="/palette?set=ggsci-npg">NPG 色卡</a></li>
+        </ul>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h3 class="text-lg font-medium">最近使用</h3>
+        <div id="recentList" class="mt-3 text-sm text-gray-700 space-y-2">
+          <!-- Filled by JS -->
+          <p class="text-gray-500">暂无记录</p>
+        </div>
+      </div>
+
+      <!-- Notifications / Updates -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h3 class="text-lg font-medium">更新动态</h3>
+        <ul class="mt-3 text-sm text-gray-700 space-y-2" id="updatesList">
+          <li>· 本周新增软件：<span class="font-medium">RAxML-NG</span></li>
+          <li>· NCBI 装配更新：<span class="font-medium">Ovis aries</span> 注释版本提升</li>
+          <li>· 新增色卡：<span class="font-medium">Science-Blue</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Promo / Learn / Stats -->
+    <section class="grid lg:grid-cols-3 gap-5">
+      <!-- Learn Cards -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h3 class="text-lg font-medium">新手入门</h3>
+        <ul class="mt-3 text-sm text-gray-700 space-y-2">
+          <li><a class="underline text-indigo-600" href="/docs/genome">如何快速找到“最新基因组”？</a></li>
+          <li><a class="underline text-indigo-600" href="/docs/software">如何按任务选择生信软件？</a></li>
+          <li><a class="underline text-indigo-600" href="/docs/palette">如何导出色卡到 ggplot2 / matplotlib？</a></li>
+        </ul>
+      </div>
+
+      <!-- Resources -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h3 class="text-lg font-medium">常用资源</h3>
+        <ul class="mt-3 text-sm text-gray-700 space-y-2">
+          <li><a class="underline text-indigo-600" href="https://www.ncbi.nlm.nih.gov/" target="_blank" rel="noreferrer">NCBI</a> · <a class="underline text-indigo-600" href="https://ensembl.org" target="_blank" rel="noreferrer">Ensembl</a> · <a class="underline text-indigo-600" href="https://genome.ucsc.edu" target="_blank" rel="noreferrer">UCSC</a></li>
+          <li><a class="underline text-indigo-600" href="https://anaconda.org/bioconda" target="_blank" rel="noreferrer">bioconda</a> · <a class="underline text-indigo-600" href="https://bioconductor.org" target="_blank" rel="noreferrer">Bioconductor</a></li>
+          <li><a class="underline text-indigo-600" href="/docs/pipelines">典型分析流程（PCA/ADMIXTURE/TreeMix）</a></li>
+        </ul>
+      </div>
+
+      <!-- Stats -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h3 class="text-lg font-medium">平台统计</h3>
+        <div class="grid grid-cols-3 gap-4 text-center mt-4">
+          <div>
+            <div class="text-2xl font-semibold" id="statSpecies">—</div>
+            <div class="text-xs text-gray-500">物种</div>
+          </div>
+          <div>
+            <div class="text-2xl font-semibold" id="statSoftware">—</div>
+            <div class="text-xs text-gray-500">软件</div>
+          </div>
+          <div>
+            <div class="text-2xl font-semibold" id="statPalettes">—</div>
+            <div class="text-xs text-gray-500">色卡</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="pt-4 text-xs text-gray-500">
+      <p>© 2025 Genome Finder · MIT License · 作者：刘仕豪</p>
+    </footer>
+  </div>
+
+  <!-- Auth Modal (minimal mock) -->
+  <dialog id="authModal" class="rounded-2xl p-0 w-full max-w-md">
+    <form method="dialog" class="bg-white rounded-2xl shadow">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-medium" id="authTitle">登录</h3>
+      </div>
+      <div class="px-6 py-4 space-y-3">
+        <label class="block text-sm">邮箱
+          <input id="authEmail" type="email" class="mt-1 w-full border rounded-xl px-3 py-2" required />
+        </label>
+        <label class="block text-sm">密码
+          <input id="authPass" type="password" class="mt-1 w-full border rounded-xl px-3 py-2" required />
+        </label>
+        <p class="text-xs text-gray-500">* 这里为前端原型，后续接入 Firebase Auth。</p>
+      </div>
+      <div class="px-6 py-4 border-t flex items-center justify-end gap-3">
+        <button class="px-4 py-2 rounded-xl border">取消</button>
+        <button id="authSubmit" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">确定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // ---------------------------
+    // Minimal front-end behavior
+    // ---------------------------
+
+    // Search dispatcher: route by scope or heuristics
+    const $ = (sel)=>document.querySelector(sel);
+    const q = $("#q"), scope = $("#scope"), btnSearch = $("#btnSearch");
+
+    function smartRoute() {
+      const text = (q.value||"").trim();
+      const scp = scope.value;
+      if (!text) { q.focus(); return; }
+
+      // If scope is explicit
+      if (scp === "genome") return location.href = "/genome?q=" + encodeURIComponent(text);
+      if (scp === "software") return location.href = "/software?q=" + encodeURIComponent(text);
+      if (scp === "palette") return location.href = "/palette?q=" + encodeURIComponent(text);
+
+      // Heuristics for "auto"
+      const t = text.toLowerCase();
+      const looksLikeLatin = /^[a-z]+\s+[a-z\-]+$/.test(t);
+      const softwareHints = ["plink","admixture","treemix","bcftools","angsd","smc++","xp-clr","selscan","dfoil","dadi","fastsimcoal","beagle","ldblockshow"];
+      const paletteHints  = ["viridis","npg","lancet","ucsc","paired","set1","science","nature","colorbrewer"];
+      if (looksLikeLatin || ["donkey","equus","camel","ovis","bos","sus","gallus","kiang","onager","驴","骆驼","绵羊","牛","猪","鸡","藏野驴"].some(k=>t.includes(k))) {
+        return location.href = "/genome?q=" + encodeURIComponent(text);
+      }
+      if (softwareHints.some(k => t.includes(k))) {
+        return location.href = "/software?q=" + encodeURIComponent(text);
+      }
+      if (paletteHints.some(k => t.includes(k))) {
+        return location.href = "/palette?q=" + encodeURIComponent(text);
+      }
+      // default fallback
+      location.href = "/genome?q=" + encodeURIComponent(text);
+    }
+    btnSearch.addEventListener("click", smartRoute);
+    q.addEventListener("keydown", e => { if (e.key === "Enter") smartRoute(); });
+
+    // Fake stats (replace via API later)
+    $("#statSpecies").textContent = "120+";
+    $("#statSoftware").textContent = "80+";
+    $("#statPalettes").textContent = "30+";
+
+    // Auth modal (mock — integrate Firebase later)
+    const authModal = $("#authModal");
+    const btnLogin = $("#btnLogin"), btnRegister = $("#btnRegister"), authTitle=$("#authTitle");
+    btnLogin?.addEventListener("click", ()=>{ authTitle.textContent="登录"; authModal.showModal(); });
+    btnRegister?.addEventListener("click", ()=>{ authTitle.textContent="注册"; authModal.showModal(); });
+    $("#authSubmit")?.addEventListener("click", (e)=>{ e.preventDefault(); authModal.close(); alert("Demo：登录/注册将在后续接入 Firebase Auth。"); });
+
+    // Recent usage storage (simple localStorage demo)
+    const recentKey = "gf_recent";
+    function addRecent(label, url) {
+      const list = JSON.parse(localStorage.getItem(recentKey)||"[]");
+      list.unshift({label,url,ts:Date.now()});
+      const uniq = [];
+      const seen = new Set();
+      for (const it of list) {
+        const sig = it.url;
+        if (!seen.has(sig)) { uniq.push(it); seen.add(sig); }
+        if (uniq.length>=6) break;
+      }
+      localStorage.setItem(recentKey, JSON.stringify(uniq));
+    }
+    // Render recent
+    function renderRecent() {
+      const wrap = $("#recentList");
+      const list = JSON.parse(localStorage.getItem(recentKey)||"[]");
+      if (!list.length) { wrap.innerHTML = '<p class="text-gray-500">暂无记录</p>'; return; }
+      wrap.innerHTML = list.map(it=>`<div><a class="underline text-indigo-600" href="${it.url}">${it.label}</a></div>`).join("");
+    }
+    renderRecent();
+
+    // Example: attach search to recent
+    btnSearch.addEventListener("click", ()=> {
+      const text = (q.value||"").trim();
+      if (!text) return;
+      const scp = scope.value === "auto" ? "自动" : scope.value;
+      addRecent(`搜索：${text}（${scp}）`, "javascript:void(0)");
+      renderRecent();
+    });
+
+    // Edit shortcuts (placeholder)
+    $("#btnEditShortcuts")?.addEventListener("click", ()=> alert("后续将支持登录后编辑‘我的快捷入口’。"));
+  </script>
+</body>
+</html>
