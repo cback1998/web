@@ -1,0 +1,105 @@
+[
+  {
+    "id": "plink",
+    "name": "PLINK",
+    "category": ["population", "qc"],
+    "desc": "经典 GWAS/群体遗传工具，支持 PCA、QC、LD、IBD 等。",
+    "langs": ["C++"], "os": ["linux","macos","windows"],
+    "install": {
+      "conda": "mamba install -c conda-forge -c bioconda plink=1.9",
+      "docker": "docker pull biocontainers/plink:v1.9.0_cvX",
+      "source": "https://www.cog-genomics.org/plink/1.9/"
+    },
+    "pkg": {
+      "conda_pkg": "plink",
+      "conda_ver": "1.9",
+      "conda_channels": ["conda-forge","bioconda"],
+      "pip_pkg": "",
+      "pip_ver": "",
+      "docker_image": "biocontainers/plink",
+      "docker_tag": "v1.9.0_cvX"
+    }
+  },
+  {
+    "id": "admixture",
+    "name": "ADMIXTURE",
+    "category": ["population"],
+    "desc": "最大似然群体结构推断（类似 STRUCTURE），速度快。",
+    "langs": ["C"], "os": ["linux","macos"],
+    "install": {
+      "conda": "mamba install -c bioconda admixture",
+      "docker": "docker pull biocontainers/admixture:v1.3.0_cvX",
+      "source": "https://dalexander.github.io/admixture/"
+    },
+    "pkg": {
+      "conda_pkg": "admixture",
+      "conda_ver": "",
+      "conda_channels": ["bioconda","conda-forge"],
+      "pip_pkg": "",
+      "pip_ver": "",
+      "docker_image": "biocontainers/admixture",
+      "docker_tag": "v1.3.0_cvX"
+    }
+  },
+  {
+    "id": "treemix",
+    "name": "TreeMix",
+    "category": ["population"],
+    "desc": "基于等位基因频率构建群体树并推断基因流。",
+    "langs": ["C++"], "os": ["linux","macos"],
+    "install": {
+      "conda": "mamba install -c bioconda treemix",
+      "source": "https://bitbucket.org/nygcresearch/treemix/"
+    },
+    "pkg": {
+      "conda_pkg": "treemix",
+      "conda_ver": "",
+      "conda_channels": ["bioconda","conda-forge"],
+      "pip_pkg": "",
+      "pip_ver": "",
+      "docker_image": "",
+      "docker_tag": ""
+    }
+  },
+  {
+    "id": "bcftools",
+    "name": "bcftools",
+    "category": ["qc","annotation"],
+    "desc": "VCF/BCF 操作瑞士军刀。",
+    "langs": ["C"], "os": ["linux","macos"],
+    "install": {
+      "conda": "mamba install -c bioconda bcftools",
+      "docker": "docker pull biocontainers/bcftools:v1.20-1-deb_cv1",
+      "source": "http://www.htslib.org/"
+    },
+    "pkg": {
+      "conda_pkg": "bcftools",
+      "conda_ver": "1.20",
+      "conda_channels": ["bioconda","conda-forge"],
+      "pip_pkg": "",
+      "pip_ver": "",
+      "docker_image": "biocontainers/bcftools",
+      "docker_tag": "v1.20-1-deb_cv1"
+    }
+  },
+  {
+    "id": "angsd",
+    "name": "ANGSD",
+    "category": ["population"],
+    "desc": "低深度测序的群体统计与多样性分析。",
+    "langs": ["C"], "os": ["linux","macos"],
+    "install": {
+      "conda": "mamba install -c bioconda angsd",
+      "source": "http://www.popgen.dk/angsd"
+    },
+    "pkg": {
+      "conda_pkg": "angsd",
+      "conda_ver": "",
+      "conda_channels": ["bioconda","conda-forge"],
+      "pip_pkg": "",
+      "pip_ver": "",
+      "docker_image": "",
+      "docker_tag": ""
+    }
+  }
+]
