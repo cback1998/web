@@ -17,13 +17,15 @@
     <!-- Header -->
     <header class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <a href="../" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
+        <!-- 改：加 id="logoLink"，href 初始值无所谓，稍后脚本会覆盖 -->
+        <a id="logoLink" href="#" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
         <div>
           <h1 class="text-2xl font-semibold">Palette Studio</h1>
           <p class="text-sm text-gray-600">预置/自定义色卡 · 出版级可用 · 一键导出 R / Python 代码</p>
         </div>
       </div>
-      <a href="../" class="text-indigo-600 underline">返回首页</a>
+      <!-- 改：加 id="homeLink"，href 初始值无所谓，稍后脚本会覆盖 -->
+      <a id="homeLink" href="#" class="text-indigo-600 underline">返回首页</a>
     </header>
 
     <!-- Controls -->
@@ -117,11 +119,21 @@
   </div>
 
   <script>
+    // -------- 动态设置首页链接（适配 github.io 项目站 / 自定义域） --------
+    (function () {
+      const segs = location.pathname.split('/').filter(Boolean);
+      // 仅当是 *username.github.io* 且路径有仓库段时，首页为 "/<repo>/"
+      const isProject = location.hostname.endsWith('github.io') && segs.length >= 1;
+      const home = isProject ? `/${segs[0]}/` : '/';
+      const homeLink = document.getElementById('homeLink');
+      const logoLink = document.getElementById('logoLink');
+      if (homeLink) homeLink.setAttribute('href', home);
+      if (logoLink) logoLink.setAttribute('href', home);
+    })();
+
     // ------------------------------
     // Presets (public domain or re-mapped well-known palettes)
     // ------------------------------
-
-    // Categorical presets: arrays of hex colors
     const PRESETS_CATEGORICAL = {
       "ggsci-npg": ["#E64B35","#4DBBD5","#00A087","#3C5488","#F39B7F","#8491B4","#91D1C2","#7E6148","#B09C85","#DC0000"],
       "ggsci-lancet": ["#00468B","#ED0000","#42B540","#0099B4","#925E9F","#FDAF91","#AD002A","#ADB6B6","#1B1919"],
@@ -129,23 +141,16 @@
       "brewer-Paired": ["#A6CEE3","#1F78B4","#B2DF8A","#33A02C","#FB9A99","#E31A1C","#FDBF6F","#FF7F00","#CAB2D6","#6A3D9A","#FFFF99","#B15928"],
       "science-friendly": ["#1F78B4","#33A02C","#E31A1C","#FF7F00","#6A3D9A","#B15928","#A6CEE3","#B2DF8A","#FB9A99","#FDBF6F"]
     };
-
-    // Sequential presets: color stops for interpolation
     const PRESETS_SEQUENTIAL = {
       "viridis": [["#440154",0],["#31688E",0.33],["#35B779",0.66],["#FDE725",1]],
       "brewer-Blues": [["#F7FBFF",0],["#6BAED6",0.6],["#08306B",1]],
       "brewer-OrRd": [["#FFF7EC",0],["#FC8D59",0.6],["#7F0000",1]]
     };
-
-    // Diverging presets: color stops
     const PRESETS_DIVERGING = {
       "brewer-RdBu": [["#B2182B",0],["#F7F7F7",0.5],["#2166AC",1]],
       "brewer-PRGn": [["#762A83",0],["#F7F7F7",0.5],["#1B7837",1]]
     };
 
-    // ------------------------------
-    // DOM helpers
-    // ------------------------------
     const $ = s => document.querySelector(s);
     const typeSel = $("#typeSel"), presetSel = $("#presetSel"), nColors = $("#nColors");
     const chipRow = $("#chipRow"), minContrast = $("#minContrast");
@@ -159,9 +164,6 @@
       setTimeout(()=> d.remove(), 1200);
     }
 
-    // ------------------------------
-    // Color utilities
-    // ------------------------------
     function hexToRgb(hex){
       const m = hex.replace("#","").match(/^([0-9a-f]{6})$/i);
       if(!m) return {r:0,g:0,b:0};
@@ -204,9 +206,6 @@
       return out;
     }
 
-    // ------------------------------
-    // UI renderers
-    // ------------------------------
     function fillPresetOptions(){
       function opts(map){ return Object.keys(map).map(k=>`<option value="${k}">${k}</option>`).join(""); }
       presetSel.innerHTML = opts(PRESETS_CATEGORICAL);
@@ -237,9 +236,6 @@
       return colors.length>1 ? min : 0;
     }
 
-    // ------------------------------
-    // Preview painters
-    // ------------------------------
     function drawManhattan(colors){
       const ctx = cvM.getContext("2d"); ctx.clearRect(0,0,cvM.width,cvM.height);
       const W=cvM.width, H=cvM.height, pad=30;
@@ -310,9 +306,6 @@
       }
     }
 
-    // ------------------------------
-    // Code exporters
-    // ------------------------------
     function rCode(colors, type){
       if(type==="categorical"){
         return `# Discrete palette\nscale_color_manual(values = c(${colors.map(c=>`"${c}"`).join(", ")}))\n# Or\nscale_fill_manual(values = c(${colors.map(c=>`"${c}"`).join(", ")}))`;
@@ -328,9 +321,6 @@
       }
     }
 
-    // ------------------------------
-    // State and actions
-    // ------------------------------
     let PALETTE = [];
     function buildFromPreset(){
       const t = typeSel.value;
@@ -357,9 +347,6 @@
       codePy.textContent = pyCode(PALETTE, typeSel.value);
     }
 
-    // ------------------------------
-    // Events
-    // ------------------------------
     function boot(){
       function opts(map){ return Object.keys(map).map(k=>`<option value="${k}">${k}</option>`).join(""); }
       document.querySelector("#presetSel").innerHTML = opts(PRESETS_CATEGORICAL);
