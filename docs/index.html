@@ -23,7 +23,7 @@
         </div>
       </div>
       <nav class="flex items-center gap-3" id="authArea">
-        <!-- Auth buttons will toggle by JS -->
+        <!-- 登录态由 auth-ui.js 接管；初始占位按钮 -->
         <button id="btnLogin" class="px-4 py-2 rounded-xl border">登录</button>
         <button id="btnRegister" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">注册</button>
       </nav>
@@ -152,7 +152,7 @@
     </footer>
   </div>
 
-  <!-- Auth Modal (minimal mock) -->
+  <!-- Auth Modal -->
   <dialog id="authModal" class="rounded-2xl p-0 w-full max-w-md">
     <form method="dialog" class="bg-white rounded-2xl shadow">
       <div class="px-6 py-4 border-b">
@@ -165,7 +165,7 @@
         <label class="block text-sm">密码
           <input id="authPass" type="password" class="mt-1 w-full border rounded-xl px-3 py-2" required />
         </label>
-        <p class="text-xs text-gray-500">* 这里为前端原型，后续接入 Firebase Auth。</p>
+        <p class="text-xs text-gray-500">* 使用邮箱/密码登录或注册（Firebase Auth）。</p>
       </div>
       <div class="px-6 py-4 border-t flex items-center justify-end gap-3">
         <button class="px-4 py-2 rounded-xl border">取消</button>
@@ -176,10 +176,8 @@
 
   <script>
     // ---------------------------
-    // Minimal front-end behavior
+    // Minimal front-end behavior (与 Firebase 无关)
     // ---------------------------
-
-    // Search dispatcher: route by scope or heuristics
     const $ = (sel)=>document.querySelector(sel);
     const q = $("#q"), scope = $("#scope"), btnSearch = $("#btnSearch");
 
@@ -218,14 +216,7 @@
     $("#statSoftware").textContent = "80+";
     $("#statPalettes").textContent = "30+";
 
-    // Auth modal (mock — integrate Firebase later)
-    const authModal = $("#authModal");
-    const btnLogin = $("#btnLogin"), btnRegister = $("#btnRegister"), authTitle=$("#authTitle");
-    btnLogin?.addEventListener("click", ()=>{ authTitle.textContent="登录"; authModal.showModal(); });
-    btnRegister?.addEventListener("click", ()=>{ authTitle.textContent="注册"; authModal.showModal(); });
-    $("#authSubmit")?.addEventListener("click", (e)=>{ e.preventDefault(); authModal.close(); alert("Demo：登录/注册将在后续接入 Firebase Auth。"); });
-
-    // Recent usage storage (simple localStorage demo)
+    // Recent usage (localStorage demo)
     const recentKey = "gf_recent";
     function addRecent(label, url) {
       const list = JSON.parse(localStorage.getItem(recentKey)||"[]");
@@ -239,7 +230,6 @@
       }
       localStorage.setItem(recentKey, JSON.stringify(uniq));
     }
-    // Render recent
     function renderRecent() {
       const wrap = $("#recentList");
       const list = JSON.parse(localStorage.getItem(recentKey)||"[]");
@@ -247,8 +237,6 @@
       wrap.innerHTML = list.map(it=>`<div><a class="underline text-indigo-600" href="${it.url}">${it.label}</a></div>`).join("");
     }
     renderRecent();
-
-    // Example: attach search to recent
     btnSearch.addEventListener("click", ()=> {
       const text = (q.value||"").trim();
       if (!text) return;
@@ -260,5 +248,9 @@
     // Edit shortcuts (placeholder)
     $("#btnEditShortcuts")?.addEventListener("click", ()=> alert("后续将支持登录后编辑‘我的快捷入口’。"));
   </script>
+
+  <!-- 引入 Firebase 统一初始化与登录 UI（路径相对首页） -->
+  <script type="module" src="./_shared/firebase.js"></script>
+  <script type="module" src="./_shared/auth-ui.js"></script>
 </body>
 </html>
