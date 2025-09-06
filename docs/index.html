@@ -49,19 +49,19 @@
     <!-- Primary Feature Cards -->
     <section class="grid md:grid-cols-3 gap-5">
       <!-- Genome -->
-      <a href="/genome" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
+      <a href="genome/" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
         <h3 class="text-lg font-medium">参考基因组检索</h3>
         <p class="text-sm text-gray-600 mt-1">中文/英文/拉丁名 → NCBI/Ensembl 最新装配与注释</p>
         <div class="mt-4 inline-flex items-center gap-2 text-indigo-600">进入<span>→</span></div>
       </a>
       <!-- Software -->
-      <a href="/software" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
+      <a href="software/" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
         <h3 class="text-lg font-medium">组学软件推荐</h3>
         <p class="text-sm text-gray-600 mt-1">按任务分类：PCA、群体结构、选择扫描、系统发育等</p>
         <div class="mt-4 inline-flex items-center gap-2 text-indigo-600">进入<span>→</span></div>
       </a>
       <!-- Palette -->
-      <a href="/palette" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
+      <a href="palette/" class="bg-white rounded-2xl shadow p-6 block hover:shadow-md transition">
         <h3 class="text-lg font-medium">绘图色卡工作台</h3>
         <p class="text-sm text-gray-600 mt-1">预置/自定义色卡 · 色盲模拟 · 一键导出 R/Python 代码</p>
         <div class="mt-4 inline-flex items-center gap-2 text-indigo-600">进入<span>→</span></div>
@@ -78,9 +78,9 @@
         </div>
         <ul id="shortcutList" class="mt-3 text-sm text-gray-700 space-y-2">
           <!-- Filled by JS; sample placeholders -->
-          <li><a class="underline text-indigo-600" href="/genome?species=Equus%20asinus">Equus asinus · 基因组</a></li>
-          <li><a class="underline text-indigo-600" href="/software?highlight=plink">PLINK · 软件</a></li>
-          <li><a class="underline text-indigo-600" href="/palette?set=ggsci-npg">NPG 色卡</a></li>
+          <li><a class="underline text-indigo-600" href="genome/?species=Equus%20asinus">Equus asinus · 基因组</a></li>
+          <li><a class="underline text-indigo-600" href="software/?highlight=plink">PLINK · 软件</a></li>
+          <li><a class="underline text-indigo-600" href="palette/?set=ggsci-npg">NPG 色卡</a></li>
         </ul>
       </div>
 
@@ -110,9 +110,9 @@
       <div class="bg-white rounded-2xl shadow p-6">
         <h3 class="text-lg font-medium">新手入门</h3>
         <ul class="mt-3 text-sm text-gray-700 space-y-2">
-          <li><a class="underline text-indigo-600" href="/docs/genome">如何快速找到“最新基因组”？</a></li>
-          <li><a class="underline text-indigo-600" href="/docs/software">如何按任务选择生信软件？</a></li>
-          <li><a class="underline text-indigo-600" href="/docs/palette">如何导出色卡到 ggplot2 / matplotlib？</a></li>
+          <li><a class="underline text-indigo-600" href="genome/">如何快速找到“最新基因组”？</a></li>
+          <li><a class="underline text-indigo-600" href="software/">如何按任务选择生信软件？</a></li>
+          <li><a class="underline text-indigo-600" href="palette/">如何导出色卡到 ggplot2 / matplotlib？</a></li>
         </ul>
       </div>
 
@@ -122,7 +122,7 @@
         <ul class="mt-3 text-sm text-gray-700 space-y-2">
           <li><a class="underline text-indigo-600" href="https://www.ncbi.nlm.nih.gov/" target="_blank" rel="noreferrer">NCBI</a> · <a class="underline text-indigo-600" href="https://ensembl.org" target="_blank" rel="noreferrer">Ensembl</a> · <a class="underline text-indigo-600" href="https://genome.ucsc.edu" target="_blank" rel="noreferrer">UCSC</a></li>
           <li><a class="underline text-indigo-600" href="https://anaconda.org/bioconda" target="_blank" rel="noreferrer">bioconda</a> · <a class="underline text-indigo-600" href="https://bioconductor.org" target="_blank" rel="noreferrer">Bioconductor</a></li>
-          <li><a class="underline text-indigo-600" href="/docs/pipelines">典型分析流程（PCA/ADMIXTURE/TreeMix）</a></li>
+          <li><a class="underline text-indigo-600" href="pipeline/">典型分析流程（PCA/ADMIXTURE/TreeMix）</a></li>
         </ul>
       </div>
 
@@ -189,9 +189,9 @@
       if (!text) { q.focus(); return; }
 
       // If scope is explicit
-      if (scp === "genome") return location.href = "/genome?q=" + encodeURIComponent(text);
-      if (scp === "software") return location.href = "/software?q=" + encodeURIComponent(text);
-      if (scp === "palette") return location.href = "/palette?q=" + encodeURIComponent(text);
+      if (scp === "genome")  return location.href = "genome/?q="   + encodeURIComponent(text);
+      if (scp === "software")return location.href = "software/?q=" + encodeURIComponent(text);
+      if (scp === "palette") return location.href = "palette/?q="  + encodeURIComponent(text);
 
       // Heuristics for "auto"
       const t = text.toLowerCase();
@@ -199,16 +199,16 @@
       const softwareHints = ["plink","admixture","treemix","bcftools","angsd","smc++","xp-clr","selscan","dfoil","dadi","fastsimcoal","beagle","ldblockshow"];
       const paletteHints  = ["viridis","npg","lancet","ucsc","paired","set1","science","nature","colorbrewer"];
       if (looksLikeLatin || ["donkey","equus","camel","ovis","bos","sus","gallus","kiang","onager","驴","骆驼","绵羊","牛","猪","鸡","藏野驴"].some(k=>t.includes(k))) {
-        return location.href = "/genome?q=" + encodeURIComponent(text);
+        return location.href = "genome/?q=" + encodeURIComponent(text);
       }
       if (softwareHints.some(k => t.includes(k))) {
-        return location.href = "/software?q=" + encodeURIComponent(text);
+        return location.href = "software/?q=" + encodeURIComponent(text);
       }
       if (paletteHints.some(k => t.includes(k))) {
-        return location.href = "/palette?q=" + encodeURIComponent(text);
+        return location.href = "palette/?q=" + encodeURIComponent(text);
       }
       // default fallback
-      location.href = "/genome?q=" + encodeURIComponent(text);
+      location.href = "genome/?q=" + encodeURIComponent(text);
     }
     btnSearch.addEventListener("click", smartRoute);
     q.addEventListener("keydown", e => { if (e.key === "Enter") smartRoute(); });
