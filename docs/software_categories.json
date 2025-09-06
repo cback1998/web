@@ -1,0 +1,16 @@
+[
+  { "id": "qc-format", "name": "质控与格式转换" },
+  { "id": "alignment", "name": "比对/映射" },
+  { "id": "variant-calling", "name": "变异检测与处理" },
+  { "id": "pca", "name": "PCA/降维" },
+  { "id": "structure", "name": "群体结构/混合比例" },
+  { "id": "treemix", "name": "基因流/群体树" },
+  { "id": "selection", "name": "选择扫描" },
+  { "id": "phylogeny", "name": "系统发育" },
+  { "id": "demography", "name": "群体史/人口史" },
+  { "id": "phasing", "name": "相位/填充" },
+  { "id": "ld-ibd", "name": "LD/IBD/亲缘" },
+  { "id": "gwas", "name": "GWAS/关联分析" },
+  { "id": "visualization", "name": "可视化" },
+  { "id": "utils", "name": "通用工具" }
+]
