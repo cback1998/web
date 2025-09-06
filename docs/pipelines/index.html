@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>典型分析流程 | Genome Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="../" class="h-10 w-10 rounded-xl bg-indigo-600 text-white grid place-items-center font-bold">GF</a>
+        <div>
+          <h1 class="text-2xl font-semibold">典型分析流程（Pipelines）</h1>
+          <p class="text-sm text-gray-600">PCA · ADMIXTURE · TreeMix · 选择扫描 · 系统发育 · 群体史</p>
+        </div>
+      </div>
+      <a class="text-indigo-600 underline" href="../">返回首页</a>
+    </header>
+
+    <!-- Tips -->
+    <section class="bg-white rounded-2xl shadow p-6">
+      <p class="text-sm text-gray-700">每个流程给出<strong>最小可运行</strong>命令与关键注意事项，并附“相关软件”跳转。建议先构建 Conda 环境后再运行。</p>
+      <div class="mt-3 text-sm">
+        <button id="btnCopyEnv" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white">复制推荐 environment.yml</button>
+      </div>
+      <pre id="envBlock" class="mt-3 bg-gray-50 rounded-xl p-4 mono text-sm overflow-x-auto">name: gf-popgen
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.10
+  - plink=1.9
+  - admixture
+  - treemix
+  - bcftools
+  - angsd
+  - iqtree
+  - raxml-ng
+  - samtools
+  - bedtools
+</pre>
+    </section>
+
+    <!-- Pipeline sections (use <details> for collapsible content) -->
+    <section class="space-y-4">
+      <!-- QC & format -->
+      <details class="bg-white rounded-2xl shadow p-6" open>
+        <summary class="text-lg font-medium cursor-pointer">1) 质控与格式转换（fastp / bcftools / PLINK）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <p>目标：得到可用于群体遗传分析的 <span class="mono">BED/BIM/FAM</span> 或高质量 VCF。</p>
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto"># FASTQ → 清洗（示例）
+fastp -i r1.fq.gz -I r2.fq.gz -o c1.fq.gz -O c2.fq.gz -h fastp.html
+
+# BAM/CRAM → VCF（示例，实际请按流程对齐/去重复/重校正）
+bcftools mpileup -Ou -f ref.fa aln.bam | bcftools call -mv -Oz -o raw.vcf.gz
+bcftools filter -e &#x27;QUAL&lt;30 || DP&lt;5&#x27; -Oz -o filt.vcf.gz raw.vcf.gz
+bcftools index filt.vcf.gz
+
+# VCF → PLINK 二进制
+plink --vcf filt.vcf.gz --double-id --allow-extra-chr --make-bed --out data
+
+# 基本 QC
+plink --bfile data --geno 0.05 --maf 0.05 --hwe 1e-6 --make-bed --out data.qc</pre>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=bcftools">相关软件：bcftools</a>
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=plink">PLINK</a>
+          </div>
+        </div>
+      </details>
+
+      <!-- PCA -->
+      <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="text-lg font-medium cursor-pointer">2) PCA（PLINK）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto">plink --bfile data.qc --pca 20 --out pca
+# 输出：pca.eigenvec / pca.eigenval</pre>
+          <p>注意：长连锁不平衡区域需先去除（或用 LD 修剪 <span class="mono">--indep-pairwise</span>）。</p>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=plink">PLINK</a>
+          </div>
+        </div>
+      </details>
+
+      <!-- ADMIXTURE -->
+      <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="text-lg font-medium cursor-pointer">3) 群体结构（ADMIXTURE）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto"># K 从 2 到 8 交叉验证
+for K in $(seq 2 8); do
+  admixture --cv=10 data.qc.bed $K | tee log${K}.out
+done</pre>
+          <p>从 <span class="mono">logK.out</span> 中比较 CV error 选择最优 K；输入需为 <span class="mono">BED/BIM/FAM</span>。</p>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=admixture">ADMIXTURE</a>
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=plink">PLINK</a>
+          </div>
+        </div>
+      </details>
+
+      <!-- TreeMix -->
+      <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="text-lg font-medium cursor-pointer">4) 基因流与群体树（TreeMix）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto"># 先制备等位基因频率矩阵（略）
+treemix -i data.frq.gz -o out -k 500 -m 3
+# -k: block size; -m: migration edges</pre>
+          <p>注意：群体样本量差异较大时需做 downsampling 或加权。</p>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=treemix">TreeMix</a>
+          </div>
+        </div>
+      </details>
+
+      <!-- Selection scans -->
+      <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="text-lg font-medium cursor-pointer">5) 选择扫描（FST / XP-CLR / iHS/XP-EHH）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto"># FST（VCFtools 或 PLINK）
+vcftools --gzvcf popA.vcf.gz --weir-fst-pop A.txt --weir-fst-pop B.txt --out fst
+
+# XP-CLR（示例）
+xpclr -xpclr A.snp B.snp ref.fa -w1 0.1 200 2000 -o xpclr.out
+
+# iHS / XP-EHH（selscan）
+selscan --ihs --vcf phased.vcf.gz --out ihs</pre>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=selscan">selscan</a>
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=xp-clr">XP-CLR</a>
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=plink">PLINK</a>
+          </div>
+        </div>
+      </details>
+
+      <!-- Phylogeny -->
+      <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="text-lg font-medium cursor-pointer">6) 系统发育（IQ-TREE / RAxML-NG）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto"># IQ-TREE
+iqtree -s aln.phy -m GTR+G -bb 1000 -nt AUTO
+
+# RAxML-NG
+raxml-ng --all --msa aln.phy --model GTR+G --bs-trees 1000 --threads 4</pre>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=iq-tree">IQ-TREE</a>
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=raxml-ng">RAxML-NG</a>
+          </div>
+        </div>
+      </details>
+
+      <!-- Demography -->
+      <details class="bg-white rounded-2xl shadow p-6">
+        <summary class="text-lg font-medium cursor-pointer">7) 群体史（SMC++ / PSMC）</summary>
+        <div class="mt-3 text-sm text-gray-700 space-y-3">
+          <pre class="bg-gray-50 rounded-xl p-3 mono text-sm overflow-x-auto"># SMC++
+smc++ vcf2smc data.vcf.gz out.smc.gz chr1 pop:sampleA,sampleB ...
+smc++ estimate 1.25e-8 out.smc.gz -o smc_est
+
+# PSMC（示意）
+samtools mpileup -uf ref.fa aln.bam | bcftools call -c | vcfutils.pl vcf2fq | \
+  gzip > diploid.fq.gz
+psmc -N25 -t15 -r5 -p "4+25*2+4+6" -o psmc.out diploid.psmcfa</pre>
+          <div class="flex flex-wrap gap-2">
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=smc++">SMC++</a>
+            <a class="px-3 py-1.5 rounded-lg border" href="../software/?highlight=psmc">PSMC</a>
+          </div>
+        </div>
+      </details>
