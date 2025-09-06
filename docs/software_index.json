@@ -1,0 +1,57 @@
+[
+  { "id": "fastp", "name": "fastp", "desc": "FASTQ 质控与裁剪，一体化报告", "category": ["qc-format"], "pkg": { "conda_pkg": "fastp", "conda_channels": ["bioconda"] } },
+  { "id": "fastqc", "name": "FastQC", "desc": "测序质控报告", "category": ["qc-format"], "pkg": { "conda_pkg": "fastqc", "conda_channels": ["bioconda"] } },
+  { "id": "multiqc", "name": "MultiQC", "desc": "整合多个 QC 报告", "category": ["qc-format"], "pkg": { "conda_pkg": "multiqc", "conda_channels": ["bioconda"], "pip_pkg": "multiqc" } },
+
+  { "id": "bwa", "name": "BWA", "desc": "短读长比对（mem/sampe）", "category": ["alignment"], "pkg": { "conda_pkg": "bwa", "conda_channels": ["bioconda"] } },
+  { "id": "minimap2", "name": "minimap2", "desc": "通用序列比对（短/长读长）", "category": ["alignment"], "pkg": { "conda_pkg": "minimap2", "conda_channels": ["bioconda"] } },
+
+  { "id": "samtools", "name": "samtools", "desc": "BAM/CRAM 操作", "category": ["utils", "variant-calling"], "pkg": { "conda_pkg": "samtools", "conda_channels": ["bioconda"] } },
+  { "id": "picard", "name": "Picard", "desc": "标记重复等 BAM 处理", "category": ["variant-calling", "utils"], "pkg": { "conda_pkg": "picard", "conda_channels": ["bioconda"] } },
+  { "id": "bcftools", "name": "bcftools", "desc": "VCF/BCF 操作与调用", "category": ["variant-calling", "utils"], "pkg": { "conda_pkg": "bcftools", "conda_channels": ["bioconda"] } },
+  { "id": "vcftools", "name": "VCFtools", "desc": "VCF 统计与过滤", "category": ["variant-calling", "utils"], "pkg": { "conda_pkg": "vcftools", "conda_channels": ["bioconda"] } },
+  { "id": "bedtools", "name": "BEDTools", "desc": "基因组区间操作", "category": ["utils"], "pkg": { "conda_pkg": "bedtools", "conda_channels": ["bioconda"] } },
+  { "id": "gatk4", "name": "GATK4", "desc": "变异检测流程（HaplotypeCaller 等）", "category": ["variant-calling"], "pkg": { "conda_pkg": "gatk4", "conda_channels": ["bioconda"] } },
+  { "id": "freebayes", "name": "FreeBayes", "desc": "变异检测（Bayesian）", "category": ["variant-calling"], "pkg": { "conda_pkg": "freebayes", "conda_channels": ["bioconda"] } },
+
+  { "id": "plink", "name": "PLINK 1.9", "desc": "群体遗传/关联分析基础工具", "category": ["pca", "structure", "ld-ibd", "gwas", "utils"], "pkg": { "conda_pkg": "plink", "conda_channels": ["bioconda"] } },
+  { "id": "plink2", "name": "PLINK 2", "desc": "新一代 PLINK，速度与功能提升", "category": ["pca", "gwas", "utils"], "pkg": { "conda_pkg": "plink2", "conda_channels": ["bioconda"] } },
+
+  { "id": "admixture", "name": "ADMIXTURE", "desc": "最大似然估计群体结构（K 群）", "category": ["structure"], "pkg": { "conda_pkg": "admixture", "conda_channels": ["bioconda"] } },
+  { "id": "faststructure", "name": "fastStructure", "desc": "贝叶斯群体结构（STRUCTURE 替代）", "category": ["structure"], "pkg": { "conda_pkg": "faststructure", "conda_channels": ["bioconda"] } },
+  { "id": "angsd", "name": "ANGSD / NGSadmix", "desc": "低深度数据群体遗传（含 NGSadmix）", "category": ["structure", "selection", "demography", "utils"], "pkg": { "conda_pkg": "angsd", "conda_channels": ["bioconda"] } },
+  { "id": "pcangsd", "name": "PCAngsd", "desc": "基于基因型似然的 PCA", "category": ["pca"], "pkg": { "pip_pkg": "pcangsd" } },
+
+  { "id": "treemix", "name": "TreeMix", "desc": "群体树与基因流边", "category": ["treemix"], "pkg": { "conda_pkg": "treemix", "conda_channels": ["bioconda"] } },
+
+  { "id": "iqtree", "name": "IQ-TREE", "desc": "系统发育最大似然树，模型选择", "category": ["phylogeny"], "pkg": { "conda_pkg": "iqtree", "conda_channels": ["bioconda"] } },
+  { "id": "raxml-ng", "name": "RAxML-NG", "desc": "快速最大似然系统发育", "category": ["phylogeny"], "pkg": { "conda_pkg": "raxml-ng", "conda_channels": ["bioconda"] } },
+
+  { "id": "smcpp", "name": "SMC++", "desc": "群体历史（Ne 曲线；单/多群体）", "category": ["demography"], "pkg": { "conda_pkg": "smc++", "conda_channels": ["conda-forge", "bioconda"] } },
+  { "id": "psmc", "name": "PSMC", "desc": "个体历史 Ne 推断", "category": ["demography"], "pkg": { "conda_pkg": "psmc", "conda_channels": ["bioconda"] } },
+  { "id": "msmc2", "name": "MSMC2", "desc": "多样本群体历史", "category": ["demography"], "pkg": { "conda_pkg": "msmc2", "conda_channels": ["bioconda"] } },
+  { "id": "dadi", "name": "dadi", "desc": "基于 SFS 的人口史模型拟合", "category": ["demography"], "pkg": { "pip_pkg": "dadi" } },
+  { "id": "fastsimcoal2", "name": "fastsimcoal2", "desc": "复杂人口史仿真与拟合", "category": ["demography"], "pkg": { "conda_pkg": "fastsimcoal2", "conda_channels": ["bioconda"] } },
+
+  { "id": "selscan", "name": "selscan", "desc": "iHS / XP-EHH / nSL 等选择扫描", "category": ["selection"], "pkg": { "conda_pkg": "selscan", "conda_channels": ["bioconda"] } },
+  { "id": "xpclr", "name": "XP-CLR", "desc": "跨群体连锁不平衡选择扫描", "category": ["selection"], "pkg": { } },
+  { "id": "sweepfinder2", "name": "SweepFinder2", "desc": "硬选择扫面检测", "category": ["selection"], "pkg": { "conda_pkg": "sweepfinder2", "conda_channels": ["bioconda"] } },
+  { "id": "sweed", "name": "SweeD", "desc": "基于 SFS 的扫选检测", "category": ["selection"], "pkg": { "conda_pkg": "sweed", "conda_channels": ["bioconda"] } },
+
+  { "id": "whatshap", "name": "WhatsHap", "desc": "基于读段的相位（长读/三代友好）", "category": ["phasing"], "pkg": { "conda_pkg": "whatshap", "conda_channels": ["bioconda"] } },
+  { "id": "shapeit4", "name": "SHAPEIT4", "desc": "基于 HMM 的快速相位", "category": ["phasing"], "pkg": { "conda_pkg": "shapeit4", "conda_channels": ["bioconda"] } },
+  { "id": "impute5", "name": "IMPUTE5", "desc": "基于参考面板的填充", "category": ["phasing"], "pkg": { "conda_pkg": "impute5", "conda_channels": ["bioconda"] } },
+
+  { "id": "king", "name": "KING", "desc": "亲缘/家系推断", "category": ["ld-ibd"], "pkg": { "conda_pkg": "king", "conda_channels": ["bioconda"] } },
+  { "id": "hap-ibd", "name": "Hap-IBD", "desc": "单倍型共享/IBD 侦测（Beagle 家族）", "category": ["ld-ibd"], "pkg": { "conda_pkg": "hap-ibd", "conda_channels": ["bioconda"] } },
+
+  { "id": "gcta", "name": "GCTA", "desc": "方差成分/GRM/混合线性模型", "category": ["gwas", "ld-ibd"], "pkg": { "conda_pkg": "gcta", "conda_channels": ["bioconda"] } },
+  { "id": "gemma", "name": "GEMMA", "desc": "LMM/BSLMM 关联分析", "category": ["gwas"], "pkg": { "conda_pkg": "gemma", "conda_channels": ["bioconda"] } },
+  { "id": "regenie", "name": "REGENIE", "desc": "大规模稀疏 LMM GWAS", "category": ["gwas"], "pkg": { "conda_pkg": "regenie", "conda_channels": ["bioconda"] } },
+
+  { "id": "ldblockshow", "name": "LDBlockShow", "desc": "LD 模块与连锁衰减可视化", "category": ["visualization"], "pkg": { "conda_pkg": "ldblockshow", "conda_channels": ["bioconda"] } },
+
+  { "id": "htslib", "name": "HTSlib/tabix", "desc": "bgzip/tabix 压缩索引与切片", "category": ["utils"], "pkg": { "conda_pkg": "htslib", "conda_channels": ["bioconda"] } },
+  { "id": "sra-tools", "name": "SRA-Tools", "desc": "下载/转换 SRA 数据", "category": ["utils"], "pkg": { "conda_pkg": "sra-tools", "conda_channels": ["bioconda"] } },
+  { "id": "parallel", "name": "GNU Parallel", "desc": "并行化命令行任务", "category": ["utils"], "pkg": { "conda_pkg": "parallel", "conda_channels": ["conda-forge"] } }
+]
