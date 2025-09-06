@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genome Finder | 中文品种 → 最新参考基因组与注释</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-5xl mx-auto p-6">
+    <header class="mb-6">
+      <h1 class="text-3xl font-semibold">Genome Finder</h1>
+      <p class="text-gray-600 mt-1">输入 <span class="font-medium">中文品种/物种</span>（如“驴、双峰驼、绵羊”），自动解析为拉丁学名，并查询 <span class="font-medium">最新参考基因组 & 注释</span> 与源网址。</p>
+    </header>
+
+    <!-- Input card -->
+    <section class="bg-white rounded-2xl shadow p-5">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end">
+        <div class="grow">
+          <label class="block text-sm text-gray-600 mb-1">中文品种 / 物种关键词</label>
+          <input id="cnInput" type="text" placeholder="例如：驴、双峰驼、绵羊、藏野驴、骆驼、猪、鸡…"
+                 class="w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-xs text-gray-500 mt-1">可直接输入拉丁名（如 <span class="mono">Equus asinus</span>）或英文（如 <span class="mono">donkey</span>）。</p>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">数据库</label>
+          <select id="dbSelect" class="border rounded-xl px-3 py-2">
+            <option value="all">NCBI + Ensembl（推荐）</option>
+            <option value="ncbi">仅 NCBI Assembly</option>
+            <option value="ensembl">仅 Ensembl</option>
+          </select>
+        </div>
+        <button id="searchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl">查询</button>
+      </div>
+      <div class="flex items-center gap-3 mt-3">
+        <input id="strictLatest" type="checkbox" class="h-4 w-4" checked />
+        <label for="strictLatest" class="text-sm text-gray-700">严格限定“latest”（只返回当前最新装配/注释）</label>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="result" class="mt-6 space-y-6"></section>
+
+    <footer class="mt-10 text-xs text-gray-500">
+      <p>数据源：NCBI E-utilities（Assembly/Taxonomy）与 Ensembl REST。</p>
+      <p class="mt-1">开源许可证：MIT。作者：您（刘仕豪）。</p>
+    </footer>
+  </div>
+
+  <script>
+    // --- Simple CN→Species resolver ---
+    // NOTE: You can extend this mapping according to your study species.
+    // Keys are lowercase keywords in Chinese or English; values are canonical binomials.
+    const CN_TO_SPECIES = [
+      // Equids
+      { k: ["驴", "家驴", "donkey", "ass"], latin: "Equus asinus" },
+      { k: ["藏野驴", "亚洲野驴", "kiang", "onager"], latin: "Equus kiang" },
+      { k: ["马", "家马", "horse"], latin: "Equus caballus" },
+      // Camelids
+      { k: ["双峰驼", "家骆驼", "bactrian camel", "bactrian"], latin: "Camelus bactrianus" },
+      { k: ["单峰驼", "dromedary"], latin: "Camelus dromedarius" },
+      { k: ["野双峰驼", "wild bactrian"], latin: "Camelus ferus" },
+      // Bovids
+      { k: ["牛", "黄牛", "奶牛", "牛属", "cattle", "cow"], latin: "Bos taurus" },
+      { k: ["水牛", "river buffalo", "water buffalo"], latin: "Bubalus bubalis" },
+      { k: ["牦牛", "yak"], latin: "Bos grunniens" },
+      { k: ["山羊", "goat"], latin: "Capra hircus" },
+      { k: ["绵羊", "羊", "sheep"], latin: "Ovis aries" },
+      // Suids & poultry
+      { k: ["猪", "家猪", "swine", "pig"], latin: "Sus scrofa" },
+      { k: ["鸡", "家鸡", "chicken"], latin: "Gallus gallus" },
+      // Others (examples)
+      { k: ["狗", "犬", "dog"], latin: "Canis lupus familiaris" },
+      { k: ["猫", "cat"], latin: "Felis catus" },
+    ];
+
+    function guessSpecies(input) {
+      const t = (input || "").trim().toLowerCase();
+      if (!t) return null;
+      for (const row of CN_TO_SPECIES) {
+        if (row.k.some(key => t.includes(key))) return row.latin;
+      }
+      // If looks like a binomial already, accept as-is
+      if (/^[a-z]+\s+[a-z\-]+$/.test(t)) {
+        return input.trim();
+      }
+      // If single token english common name, pass-through; NCBI may match Organism field.
+      return input.trim();
+    }
+
+    // Convert binomial to Ensembl species slug (e.g., "Equus asinus" -> "equus_asinus")
+    function toEnsemblSlug(binomial) {
+      return binomial.trim().toLowerCase().replace(/\s+/g, "_");
+    }
+
+    // Fetch helper with timeout
+    async function doFetch(url, opt = {}, timeoutMs = 15000) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...opt, signal: ctrl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } finally { clearTimeout(t); }
+    }
+
+    // Query NCBI Assembly for latest assembly by organism name
+    async function queryNcbiAssemblyByOrganism(organism, strictLatest = true) {
+      // ESearch to get Assembly UID(s)
+      // - latest[filter] restricts to "current" latest assemblies
+      // - If strictLatest=false, we will drop it and later pick the top DocumentSummary by date
+      const base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+      const latestQ = strictLatest ? "+AND+latest%5Bfilter%5D" : "";
+      const term = encodeURIComponent(`${organism} [Organism]`) + latestQ;
+      const esearch = `${base}/esearch.fcgi?db=assembly&retmode=json&term=${term}`;
+      const s = await doFetch(esearch);
+      const ids = (s?.esearchresult?.idlist || []);
+      if (ids.length === 0 && strictLatest) {
+        // retry without latest filter to attempt a fallback
+        return queryNcbiAssemblyByOrganism(organism, false);
+      }
+      if (ids.length === 0) return null;
+
+      // Use the first ID for strictLatest; for non-strict, pick the one with most recent date via ESummary bulk
+      const idParam = ids.join(",");
+      const esum = `${base}/esummary.fcgi?db=assembly&retmode=json&id=${idParam}`;
+      const e = await doFetch(esum);
+      const docs = Object.values(e?.result || {}).filter(v => v && typeof v === 'object' && v.uid);
+      if (docs.length === 0) return null;
+
+      const pick = strictLatest ? docs[0] : docs.sort((a,b) => new Date(b.rsdate) - new Date(a.rsdate))[0];
+      // Normalize key outputs
+      return {
+        source: "NCBI",
+        organism: pick.organism || organism,
+        assembly_name: pick.assemblyname,
+        assembly_accession: pick.assemblyaccession, // e.g., GCF_...
+        submitter: pick.submitter,
+        update_date: pick.rsdate,
+        is_refseq: (pick.asmtype || "").toLowerCase().includes("refseq") || (pick.assemblyaccession||"").startsWith("GCF_"),
+        ftp_path: pick.ftp_path, // may be empty if suppressed
+        assembly_level: pick.asmlevel,
+        genome_rep: pick.genome_rep,
+        gc_count: pick.total_gap_length,
+        url_assembly: pick?.assemblyaccession ? `https://www.ncbi.nlm.nih.gov/assembly/${pick.assemblyaccession}` : undefined,
+      };
+    }
+
+    // Query Ensembl REST for assembly + annotation info
+    async function queryEnsemblInfo(binomial) {
+      const slug = toEnsemblSlug(binomial);
+      // Assembly info
+      const aUrl = `https://rest.ensembl.org/info/assembly/${slug}?content-type=application/json`;
+      // General species info (for annotation/version)
+      const vUrl = `https://rest.ensembl.org/info/software?content-type=application/json`;
+      // Ensembl genome metadata (species) — includes assembly and annotation version in /info/species?
+      const sUrl = `https://rest.ensembl.org/info/species?content-type=application/json`;
+
+      try {
+        const [assembly, software, speciesSet] = await Promise.all([
+          doFetch(aUrl),
+          doFetch(vUrl).catch(() => null),
+          doFetch(sUrl).catch(() => null)
+        ]);
+        // Find species record to get annotation version (if available)
+        let speciesRec = null;
+        if (speciesSet?.species) {
+          speciesRec = speciesSet.species.find(sp => sp?.name?.toLowerCase() === slug);
+        }
+        return {
+          source: "Ensembl",
+          organism: assembly?.species || binomial,
+          assembly_name: assembly?.assembly_name || assembly?.karyotype?.length ? "" : assembly?.default_coord_system_version,
+          assembly_accession: assembly?.assembly_accession,
+          assembly_date: assembly?.assembly_date,
+          ensembl_release: software?.release,
+          annotation_version: speciesRec?.annotation || speciesRec?.assembly,
+          url_species: `https://www.ensembl.org/${slug}`,
+          url_api: aUrl,
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function h(html) { const d = document.createElement('div'); d.innerText = html; return d.innerHTML; }
+
+    function renderCard(title, rows) {
+      const items = rows.filter(r => r && r.value != null && r.value !== "").map(r => `
+        <div class="grid grid-cols-3 gap-2 py-1">
+          <div class="text-gray-500 text-sm">${h(r.label)}</div>
+          <div class="col-span-2 text-sm mono">${r.html ? r.value : h(String(r.value))}</div>
+        </div>`).join("");
+      return `
+        <div class="bg-white rounded-2xl shadow p-5">
+          <h3 class="text-lg font-medium mb-3">${h(title)}</h3>
+          ${items || '<p class="text-sm text-gray-500">无可用字段</p>'}
+        </div>`;
+    }
+
+    function normalizeOrganismDisplay(input, resolved) {
+      if (!resolved) return input || '';
+      if (!input) return resolved;
+      if (input.trim().toLowerCase() === resolved.trim().toLowerCase()) return resolved;
+      return `${resolved}（由“${input}”解析）`;
+    }
+
+    async function runQuery() {
+      const q = document.getElementById('cnInput').value;
+      const strict = document.getElementById('strictLatest').checked;
+      const mode = document.getElementById('dbSelect').value;
+
+      const resolved = guessSpecies(q);
+      const container = document.getElementById('result');
+      container.innerHTML = '';
+
+      if (!resolved) {
+        container.innerHTML = '<div class="text-red-600">请输入关键词。</div>';
+        return;
+      }
+
+      // Header result: show resolved species
+      const hdr = document.createElement('div');
+      hdr.className = 'text-sm text-gray-700';
+      hdr.innerHTML = `解析物种：<span class="font-medium">${h(normalizeOrganismDisplay(q, resolved))}</span>`;
+      container.appendChild(hdr);
+
+      // Parallel queries as requested
+      const tasks = [];
+      if (mode === 'all' || mode === 'ncbi') tasks.push(queryNcbiAssemblyByOrganism(resolved, strict));
+      if (mode === 'all' || mode === 'ensembl') tasks.push(queryEnsemblInfo(resolved));
+
+      container.appendChild(spinner());
+
+      const results = await Promise.allSettled(tasks);
+      container.querySelector('#spinner')?.remove();
+
+      if (results.every(r => r.status !== 'fulfilled' || !r.value)) {
+        container.innerHTML += '<div class="text-red-600">未从所选数据库检索到结果。请尝试换用拉丁学名或关闭“严格 latest”。</div>';
+        return;
+      }
+
+      for (const r of results) {
+        if (r.status !== 'fulfilled' || !r.value) continue;
+        const v = r.value;
+        if (v.source === 'NCBI') {
+          const urlAsm = v.url_assembly ? `<a class="text-indigo-600 underline" href="${v.url_assembly}" target="_blank" rel="noreferrer">${v.assembly_accession}</a>` : (v.assembly_accession || '');
+          const ftp = v.ftp_path ? `<a class="text-indigo-600 underline" href="${v.ftp_path}" target="_blank" rel="noreferrer">${v.ftp_path}</a>` : '';
+          const card = renderCard('NCBI Assembly（最新）', [
+            { label: 'Organism', value: v.organism },
+            { label: 'Assembly name', value: v.assembly_name },
+            { label: 'Assembly accession', value: urlAsm, html: true },
+            { label: 'Assembly level', value: v.assembly_level },
+            { label: 'Genome representation', value: v.genome_rep },
+            { label: 'Release/Update date', value: v.update_date },
+            { label: 'Submitter', value: v.submitter },
+            { label: 'FTP path', value: ftp, html: true },
+          ]);
+          container.innerHTML += card;
+        }
+        if (v.source === 'Ensembl') {
+          const spUrl = v.url_species ? `<a class="text-indigo-600 underline" href="${v.url_species}" target="_blank" rel="noreferrer">${v.url_species}</a>` : '';
+          const apiUrl = v.url_api ? `<a class="text-indigo-600 underline" href="${v.url_api}" target="_blank" rel="noreferrer">${v.url_api}</a>` : '';
+          const card = renderCard('Ensembl（装配与注释）', [
+            { label: 'Organism', value: v.organism },
+            { label: 'Assembly name', value: v.assembly_name },
+            { label: 'Assembly accession', value: v.assembly_accession },
+            { label: 'Assembly date', value: v.assembly_date },
+            { label: 'Annotation/Release', value: v.annotation_version || '' },
+            { label: 'Ensembl release', value: v.ensembl_release || '' },
+            { label: 'Species page', value: spUrl, html: true },
+            { label: 'REST API', value: apiUrl, html: true },
+          ]);
+          container.innerHTML += card;
+        }
+      }
+
+      // Tips card
+      container.innerHTML += renderCard('提示（可选优化）', [
+        { label: '模糊解析', value: 'CN→拉丁学名映射可在代码顶部扩展；未命中时将直接使用输入尝试检索。' },
+        { label: '稳定性', value: '生产环境建议通过后端代理 NCBI/Ensembl 请求，并添加 NCBI API key 与缓存层。' },
+        { label: '注释下载', value: 'NCBI FTP 提供 GFF/GTF/FASTA；Ensembl 物种页提供 GTF/FASTA/Compara 等链接。' },
+      ]);
+    }
+
+    function spinner() {
+      const d = document.createElement('div');
+      d.id = 'spinner';
+      d.className = 'flex items-center gap-3 text-gray-600 mt-4';
+      d.innerHTML = `
+        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        正在查询…`;
+      return d;
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', runQuery);
+    document.getElementById('cnInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runQuery();
+    });
+  </script>
+</body>
+</html>
