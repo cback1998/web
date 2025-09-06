@@ -1,142 +1,221 @@
-// /web/_shared/auth-ui.js
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+// web/_shared/auth-ui.js
+// 登录/注册 UI 与 Firebase Auth 绑定（依赖 web/_shared/firebase.js 暴露的 window.__GF__.auth）
 
-// ---- Guard & wiring ----
-if (!window.__GF__ || !window.__GF__.auth) {
-  console.error("[GF] Firebase 未就绪：window.__GF__ 不存在。请先确保 /web/_shared/firebase.js 成功加载。");
-}
+"use strict";
 
-const auth = (window.__GF__ && window.__GF__.auth) || getAuth();
-const $ = (s, ctx = document) => ctx.querySelector(s);
-
-// DOM refs（页面已有这些元素）
-const nav = $("#authArea");
-const dlg = $("#authModal");
-const titleEl = $("#authTitle");
-const emailEl = $("#authEmail");
-const passEl = $("#authPass");
-const submitBtn = $("#authSubmit");
-
-// 记录当前模式：login | register
-let mode = "login";
-
-// 简单转义
-const esc = (s) => String(s || "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
-
-// 渲染：未登录
-function renderLoggedOut() {
-  if (!nav) return;
-  nav.innerHTML = `
-    <button id="btnLogin" class="px-4 py-2 rounded-xl border">登录</button>
-    <button id="btnRegister" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">注册</button>
-  `;
-}
-
-// 渲染：已登录
-function renderLoggedIn(user) {
-  if (!nav) return;
-  const name = user.displayName || user.email || "已登录";
-  nav.innerHTML = `
-    <span class="text-sm text-gray-700">你好，${esc(name)}</span>
-    <button id="btnLogout" class="px-3 py-1.5 rounded-xl border">退出</button>
-  `;
-}
-
-// 打开对话框并切换模式
-function openDialog(nextMode) {
-  mode = nextMode;
-  if (titleEl) titleEl.textContent = mode === "register" ? "注册" : "登录";
-  if (!dlg) return console.error("[GF] 找不到 #authModal");
-  if (typeof dlg.showModal === "function") {
-    dlg.showModal();
-  } else {
-    // 极老旧浏览器兜底
-    dlg.setAttribute("open", "");
-  }
-}
-
-// 关闭对话框
-function closeDialog() {
-  if (!dlg) return;
-  if (typeof dlg.close === "function") dlg.close();
-  else dlg.removeAttribute("open");
-}
-
-// 点击委托（确保即使 nav 被重绘，监听依然有效）
-document.addEventListener("click", async (e) => {
-  const t = e.target;
-
-  if (t.closest && t.closest("#btnLogin")) {
-    e.preventDefault();
-    openDialog("login");
-    return;
+(function () {
+  // --------- 保护性检查 ----------
+  const GF = window.__GF__ || {};
+  const auth = GF.auth || null;
+  if (!auth) {
+    console.warn("[auth-ui] 未检测到 window.__GF__.auth。请确认先引入 /_shared/firebase.js 且路径正确。");
   }
 
-  if (t.closest && t.closest("#btnRegister")) {
-    e.preventDefault();
-    openDialog("register");
-    return;
+  // --------- 便捷选择器 ----------
+  const $  = (s, root = document) => root.querySelector(s);
+
+  // 可能有的元素（有些子页面可能没有登录对话框）
+  const authArea   = $("#authArea");
+  const authModal  = $("#authModal");
+  const form       = authModal ? $("form", authModal) : null;
+  const titleEl    = authModal ? $("#authTitle", authModal) : null;
+  const emailEl    = authModal ? $("#authEmail", authModal) : null;
+  const passEl     = authModal ? $("#authPass", authModal) : null;
+  const submitBtn  = authModal ? $("#authSubmit", authModal) : null;
+
+  // --------- 小工具 ----------
+  function toast(msg) {
+    const d = document.createElement("div");
+    d.className =
+      "fixed z-[1000] bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-sm px-3 py-2 rounded-xl";
+    d.textContent = msg;
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 1400);
   }
 
-  if (t.closest && t.closest("#btnLogout")) {
-    e.preventDefault();
+  function openDialog(mode /* 'login' | 'register' */) {
+    if (!authModal) return;
+    authModal.dataset.mode = mode;
+    if (titleEl) titleEl.textContent = mode === "register" ? "注册" : "登录";
+    if (submitBtn) submitBtn.textContent = "确定";
+    if (emailEl) emailEl.value = "";
+    if (passEl) passEl.value = "";
     try {
-      await signOut(auth);
-      console.log("[GF] 已退出");
-    } catch (err) {
-      console.error("[GF] 退出失败：", err);
-      alert("退出失败：" + (err?.message || err));
+      authModal.showModal();
+    } catch {
+      // 某些老浏览器不支持 <dialog>：退化为显示
+      authModal.setAttribute("open", "");
+      authModal.style.display = "block";
     }
-    return;
   }
 
-  if (t.closest && t.closest("#authSubmit")) {
-    e.preventDefault();
-    const email = emailEl?.value.trim();
-    const pass = passEl?.value;
-    if (!email || !pass) { alert("请输入邮箱和密码"); return; }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = "处理中…";
-
+  function closeDialog() {
+    if (!authModal) return;
     try {
-      if (mode === "register") {
-        await createUserWithEmailAndPassword(auth, email, pass);
-        console.log("[GF] 注册成功");
-      } else {
-        await signInWithEmailAndPassword(auth, email, pass);
-        console.log("[GF] 登录成功");
-      }
+      authModal.close();
+    } catch {
+      authModal.removeAttribute("open");
+      authModal.style.display = "none";
+    }
+    if (emailEl) emailEl.value = "";
+    if (passEl) passEl.value = "";
+  }
+
+  function renderHeader(user) {
+    if (!authArea) return;
+    if (user) {
+      authArea.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-700">已登录：${user.email || "用户"}</span>
+          <button id="btnLogout" class="px-3 py-1.5 rounded-xl border">退出</button>
+        </div>
+      `;
+    } else {
+      // 恢复“登录/注册”占位（用相同的 id，事件用委托绑定）
+      authArea.innerHTML = `
+        <button id="btnLogin" class="px-4 py-2 rounded-xl border">登录</button>
+        <button id="btnRegister" class="px-4 py-2 rounded-xl bg-indigo-600 text-white">注册</button>
+      `;
+    }
+  }
+
+  // 错误码翻译
+  function explainAuthError(code) {
+    const map = {
+      "auth/invalid-email": "邮箱格式不正确",
+      "auth/user-disabled": "该账号已被禁用",
+      "auth/user-not-found": "用户不存在",
+      "auth/wrong-password": "密码错误",
+      "auth/email-already-in-use": "该邮箱已被注册",
+      "auth/weak-password": "密码太弱（至少 6 位）",
+      "auth/too-many-requests": "尝试次数过多，请稍后再试",
+      "auth/network-request-failed": "网络错误，请检查网络",
+    };
+    return map[code] || "认证失败，请重试";
+  }
+
+  function setWorking(working) {
+    if (!submitBtn) return;
+    submitBtn.disabled = working;
+    submitBtn.classList.toggle("opacity-60", working);
+    submitBtn.textContent = working ? "处理中…" : "确定";
+  }
+
+  // --------- 事件委托（避免 DOM 被重渲染后丢失监听） ----------
+  document.addEventListener("click", async (e) => {
+    const t = e.target;
+
+    // 打开：登录 / 注册
+    if (t.closest?.("#btnLogin")) {
+      e.preventDefault();
+      openDialog("login");
+      return;
+    }
+    if (t.closest?.("#btnRegister")) {
+      e.preventDefault();
+      openDialog("register");
+      return;
+    }
+
+    // 取消：仅关闭，不触发校验
+    if (t.closest?.("#authCancel")) {
+      e.preventDefault();
       closeDialog();
-      if (emailEl) emailEl.value = "";
-      if (passEl) passEl.value = "";
-    } catch (err) {
-      console.error("[GF] 认证失败：", err);
-      // 常见：auth/operation-not-allowed 表示未在控制台启用 Email/Password
-      alert("失败：" + (err?.code || "") + " " + (err?.message || err));
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "确定";
+      return;
     }
+
+    // 退出登录
+    if (t.closest?.("#btnLogout")) {
+      e.preventDefault();
+      if (!auth) {
+        toast("未初始化 Firebase");
+        return;
+      }
+      try {
+        const { signOut } = await import(
+          "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"
+        );
+        await signOut(auth);
+        toast("已退出");
+      } catch (err) {
+        console.error(err);
+        toast("退出失败");
+      }
+      return;
+    }
+  });
+
+  // --------- 表单提交（登录 / 注册） ----------
+  if (form && submitBtn) {
+    // 用 submit 事件统一处理（可保留浏览器原生的 required 提示）
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      if (!auth) {
+        toast("未初始化 Firebase");
+        return;
+      }
+      // 手动跑一次原生校验提示（无效则直接返回）
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const mode = authModal?.dataset.mode || "login";
+      const email = emailEl?.value.trim() || "";
+      const pass  = passEl?.value || "";
+
+      setWorking(true);
+      try {
+        const {
+          signInWithEmailAndPassword,
+          createUserWithEmailAndPassword,
+        } = await import(
+          "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"
+        );
+
+        if (mode === "register") {
+          await createUserWithEmailAndPassword(auth, email, pass);
+          toast("注册成功，已自动登录");
+        } else {
+          await signInWithEmailAndPassword(auth, email, pass);
+          toast("登录成功");
+        }
+        closeDialog();
+      } catch (err) {
+        console.error(err);
+        const msg = explainAuthError(err?.code);
+        toast(msg);
+      } finally {
+        setWorking(false);
+      }
+    });
+
+    // 为了兼容某些浏览器，把“确定”按钮也拦一下（避免被视为原生提交导致对话框关闭）
+    submitBtn.addEventListener("click", (e) => {
+      // 让 form 的 submit 事件统一处理
+      e.preventDefault();
+      form.requestSubmit?.(); // 现代浏览器
+    });
   }
-});
 
-// 回车提交
-emailEl?.addEventListener("keydown", (e) => { if (e.key === "Enter") submitBtn?.click(); });
-passEl?.addEventListener("keydown", (e) => { if (e.key === "Enter") submitBtn?.click(); });
+  // --------- 监听登录态，刷新头部 ----------
+  (async function watchAuth() {
+    if (!auth || !authArea) return;
+    const { onAuthStateChanged } = await import(
+      "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js"
+    );
+    onAuthStateChanged(auth, (user) => {
+      renderHeader(user || null);
+    });
+  })();
 
-// 监听登录态
-onAuthStateChanged(auth, (user) => {
-  console.log("[GF] onAuthStateChanged:", user ? user.uid : "signed-out");
-  if (user) renderLoggedIn(user);
-  else renderLoggedOut();
-});
-
-// 启动日志
-console.log("[GF] auth-ui booted; __GF__ =", window.__GF__);
+  // --------- 暴露调试入口 ----------
+  window.__GF__ = Object.assign({}, GF, {
+    ui: {
+      openLogin: () => openDialog("login"),
+      openRegister: () => openDialog("register"),
+      closeAuth: () => closeDialog(),
+    },
+  });
+})();
