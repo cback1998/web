@@ -46,7 +46,7 @@ dependencies:
 </pre>
     </section>
 
-    <!-- Pipeline sections (use <details> for collapsible content) -->
+    <!-- Pipeline sections -->
     <section class="space-y-4">
       <!-- QC & format -->
       <details class="bg-white rounded-2xl shadow p-6" open>
@@ -58,7 +58,7 @@ fastp -i r1.fq.gz -I r2.fq.gz -o c1.fq.gz -O c2.fq.gz -h fastp.html
 
 # BAM/CRAM → VCF（示例，实际请按流程对齐/去重复/重校正）
 bcftools mpileup -Ou -f ref.fa aln.bam | bcftools call -mv -Oz -o raw.vcf.gz
-bcftools filter -e &#x27;QUAL&lt;30 || DP&lt;5&#x27; -Oz -o filt.vcf.gz raw.vcf.gz
+bcftools filter -e 'QUAL&lt;30 || DP&lt;5' -Oz -o filt.vcf.gz raw.vcf.gz
 bcftools index filt.vcf.gz
 
 # VCF → PLINK 二进制
@@ -170,3 +170,26 @@ psmc -N25 -t15 -r5 -p "4+25*2+4+6" -o psmc.out diploid.psmcfa</pre>
           </div>
         </div>
       </details>
+    </section>
+
+    <!-- Footer -->
+    <footer class="pt-4 text-xs text-gray-500">
+      <p>© 2025 Genome Finder · 以上命令为最小示例，具体参数请依据数据特性调整</p>
+    </footer>
+  </div>
+
+  <!-- Copy helper -->
+  <script>
+    const $ = s => document.querySelector(s);
+    $("#btnCopyEnv").addEventListener("click", ()=>{
+      const text = $("#envBlock").textContent;
+      navigator.clipboard.writeText(text).then(()=> {
+        const d = document.createElement("div");
+        d.className = "fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-xl";
+        d.textContent = "已复制 environment.yml"; document.body.appendChild(d);
+        setTimeout(()=> d.remove(), 1200);
+      });
+    });
+  </script>
+</body>
+</html>
