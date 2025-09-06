@@ -1,11 +1,14 @@
-<!-- docs/_shared/firebase.js -->
-<script type="module">
+// docs/_shared/firebase.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-import { getAnalytics, isSupported as analyticsSupported } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
 
-// === 你的 Firebase Web 配置（保持键名不变）===
+// === 你的 Web 配置（按你提供的原样粘贴）===
 const firebaseConfig = {
   apiKey: "AIzaSyAORia8tsA8TNGMoS2Y76h7AAhipYmdPhs",
   authDomain: "genome-finder.firebaseapp.com",
@@ -15,21 +18,17 @@ const firebaseConfig = {
   appId: "1:451538903397:web:e3949a58ab8e40d680018c",
   measurementId: "G-475T4X8964"
 };
-// ==============================================
 
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-auth.useDeviceLanguage?.();
+// 初始化
+const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
+// analytics 可选，某些浏览器/第三方拦截会报错，这里做容错
+try { getAnalytics(app); } catch {}
 
-// 可选：Analytics（仅在支持且 HTTPS 才启用）
-export let analytics = null;
-try {
-  analyticsSupported().then(supported => {
-    if (supported) analytics = getAnalytics(app);
-  });
-} catch (_) {
-  // 忽略不支持的环境（如部分 iframe / 非安全上下文）
-}
-</script>
+// Auth & Firestore
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence);  // 刷新后仍保持登录
+const db = getFirestore(app);
+
+// 暴露到全局，供其它模块使用
+window.__GF__ = { app, auth, db };
